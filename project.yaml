@@ -1,0 +1,59 @@
+project: trinet-agent-adlc
+schema_version: 1
+ticket_store: linear   # markdown | linear
+linear:
+  team_id: "4d7ec692-ad55-4138-a986-119b25f08478"
+code_host: github
+llm:
+  provider: anthropic
+  model_small: claude-haiku-4-5-20251001
+  model_mid: claude-sonnet-4-5-20250929
+  model_strongest: claude-sonnet-4-5-20250929
+  prices_usd_per_mtok:
+    claude-sonnet-4-5-20250929:
+      input: 3.0
+      output: 15.0
+      cache_read: 0.3
+      cache_creation: 3.75
+    claude-haiku-4-5-20251001:
+      input: 1.0
+      output: 5.0
+      cache_read: 0.1
+      cache_creation: 1.25
+cursor:
+  executor: cli
+  mode_default: auto
+  agent_bin: agent
+repos:
+  graphql:
+    path_key: graphql
+    url: https://github.com/goofranshaikh-eng/adlc-graphql.git
+    role: api
+    base: main
+    commands:
+      test: "python -m pytest -q"
+      lint: "python -m compileall -q src"
+  agent:
+    path_key: agent
+    url: https://github.com/goofranshaikh-eng/adlc-agents.git
+    role: agents
+    base: main
+    commands:
+      test: "python -m pytest -q"
+      lint: "python -m compileall -q src"
+  mcp:
+    path_key: mcp
+    url: https://github.com/goofranshaikh-eng/adlc-mcp-server.git
+    role: agents
+    base: main
+    commands:
+      test: "python -m pytest -q"
+      lint: "python -m compileall -q src"
+dependency_order: [graphql, mcp, agent]
+policies:
+  spec_review: cli                # cli | hub_pr (hub_pr = human-only spec review)
+  feature_pr_agent_review: true
+  feature_pr_human_review: none  # required | optional | none
+  lease_hours: 48
+budgets:
+  per_feature_anthropic_usd: 15

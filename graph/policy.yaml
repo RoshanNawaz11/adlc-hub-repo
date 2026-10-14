@@ -1,0 +1,6 @@
+# Override default ADLC graph policy here
+loops:
+  critic_fix:
+    max: 2
+  dev_inner:
+    max: 3
