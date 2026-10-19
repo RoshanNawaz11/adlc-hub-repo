@@ -81,11 +81,95 @@
 
 ---
 
+### Tests
+
+**Test 1: Server starts and `/health` returns 200 + `{"status": "ok"}`**  
+- **Verifies:** AC3 (health check)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_server.py`
+
+**Test 2: `/sse` FastMCP SSE handshake succeeds**  
+- **Verifies:** AC1 (FastMCP endpoint exists)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_server.py`
+
+**Test 3: Server fails to start if `GRAPHQL_ENDPOINT` is missing**  
+- **Verifies:** Exception 1 (startup validation)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_server.py`
+
+**Test 4: GraphQL client executes query successfully**  
+- **Verifies:** AC2 (GraphQL query execution)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_graphql_client.py`
+
+**Test 5: GraphQL client raises exception on network error**  
+- **Verifies:** Exception 1 (GraphQL unreachable)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_graphql_client.py`
+
+**Test 6: GraphQL client raises exception on GraphQL error response**  
+- **Verifies:** Exception 1 (GraphQL errors field)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_graphql_client.py`
+
+**Test 7: GraphQL client raises exception on HTTP error**  
+- **Verifies:** Exception 1 (HTTP status error)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_graphql_client.py`
+
+**Test 8: `list_sales_order` returns success payload**  
+- **Verifies:** AC1 (tool availability), AC2 (response shape)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_tools.py`
+
+**Test 9: `list_employees` returns success payload**  
+- **Verifies:** AC1 (tool availability), AC2 (response shape)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_tools.py`
+
+**Test 10: `get_sales_order_by_id` returns success payload**  
+- **Verifies:** AC1 (tool availability), AC2 (response shape)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_tools.py`
+
+**Test 11: `get_employee_by_id` returns success payload**  
+- **Verifies:** AC1 (tool availability), AC2 (response shape)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_tools.py`
+
+**Test 12: `get_sales_order_by_id` returns error for missing `id`**  
+- **Verifies:** AC2 (error shape)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_tools.py`
+
+**Test 13: Tool returns error when GraphQL client raises exception**  
+- **Verifies:** Exception 1 (error JSON shape)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_tools.py`
+
+**Test 14: Integration test for `list_sales_order` over HTTP**  
+- **Verifies:** AC1 (HTTP invocation), AC2 (response shape), AC5 (test coverage)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_integration.py`
+
+**Test 15: Integration test for `list_employees` over HTTP**  
+- **Verifies:** AC1 (HTTP invocation), AC2 (response shape), AC5 (test coverage)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_integration.py`
+
+**Test 16: Integration test for `get_sales_order_by_id` over HTTP**  
+- **Verifies:** AC1 (HTTP invocation), AC2 (response shape), AC5 (test coverage)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_integration.py`
+
+**Test 17: Integration test for `get_employee_by_id` over HTTP**  
+- **Verifies:** AC1 (HTTP invocation), AC2 (response shape), AC5 (test coverage)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_integration.py`
+
+**Test 18: Integration test for GraphQL error handling**  
+- **Verifies:** Exception 1 (server stays up, error JSON)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_integration.py`
+
+**Test 19: Integration test for health endpoint**  
+- **Verifies:** AC3 (health check)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_integration.py`
+
+**Test 20: Integration test for invalid tool input**  
+- **Verifies:** AC2 (error shape)
+- **Path:** `/home/goos/projects/adlc-mcp-server/tests/test_integration.py`
+
+---
+
 ### Definition of Done
 
 - [ ] `mcp` runs on FastAPI + FastMCP HTTP
 - [ ] README primary path is HTTP
 - [ ] All four tools work through HTTP against GraphQL
-- [ ] Tests green
+- [ ] Tests green (20 automated tests pass)
 - [ ] No regression in tool names/payloads
 - [ ] Clients know the MCP URL to use instead of stdio
