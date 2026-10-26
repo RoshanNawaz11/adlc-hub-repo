@@ -1,16 +1,16 @@
 # Proposed tickets
 
 ## 1
-- title: Agent query endpoint accepts immediately and returns run_id
-- repo: adlc-fastapi
+- title: Accept FastAPI query without blocking; return agent_run_id immediately
+- repo: app
 - ac: AC-1, AC-2
 
 ## 2
-- title: SSE event stream for agent runs with in_progress and terminal events
-- repo: adlc-fastapi
+- title: Stream PER-20 answer via SSE with in_progress, completed, or failed events
+- repo: app
 - ac: AC-3, AC-4, AC-5
 
 ## 3
-- title: Verify POST /query and GET /health unchanged
-- repo: adlc-fastapi
+- title: Preserve existing POST /query and GET /health endpoints
+- repo: app
 - ac: AC-6
