@@ -1,4 +1,3 @@
-```markdown
 # Requirements: Accept a FastAPI query immediately and publish the PER-20 answer on SSE
 
 ## Summary
@@ -50,4 +49,16 @@ When FastAPI submits a user question to `POST /agent/query`, the agent accepts i
 - A second subscriber for the same `agent_run_id` may attach; the agent does not cancel the background job when a subscriber disconnects.
 - Auth is out of scope, consistent with [PER-20](https://linear.app/personalgs/issue/PER-20/integrate-agent-with-mcp-server).
 - Tool names, id normalization, `MCP_URL`, and existing endpoints remain unchanged.
-```
+- Pydantic validation errors (HTTP 422 for missing or non-string `query`) are caught by a custom exception handler and converted to HTTP 200 `{"status": "rejected", "agent_run_id": "<id>", "reason": "invalid query"}` before the handler body executes.
+
+## Verify
+
+**Test Count:** 32 tests across 3 stories (8 + 15 + 9)
+
+**Story 1 (PER-43: 01-agent) — AC-1, AC-2:** 8 tests verify immediate accept, rejection (including Pydantic validation and empty/whitespace query), no LLM/MCP calls on invalid input, and agent_run_id consistency in run store. Tests cover valid query response timing, background job spawn absence on rejection, empty/missing/whitespace input handling, and run store event enqueue. Tests: 1–2 (AC-1 immediate return), 3–8 (AC-2 rejection with no background job spawn).
+
+**Story 2 (PER-44: 02-agent) — AC-3, AC-4, AC-5:** 15 tests verify SSE stream delivery with correct run_id, 5-second hold timing for fast/slow answers, immediate failure events, and stream closure. Tests cover HTTP 200 text/event-stream headers, first event in_progress, all events same run_id, 404 on unknown run_id, multi-subscriber event ordering, fast answer held to ≥5s, slow answer sent immediately with no extra hold, LLM/MCP errors sent immediately as failed, invalid query rejection as failed event, stream closure after completed or failed, subscriber disconnect (job continues), and late subscriber event replay. Tests: 1–5, 14–15 (AC-3 event stream), 6–8, 12 (AC-4 5-second hold), 9–11, 13 (AC-5 immediate failure).
+
+**Story 3 (PER-45: 03-agent) — AC-6:** 9 tests verify existing POST /query and GET /health remain unchanged, no latency regression, MCP process isolation, tool names, and configuration stability. Tests cover POST /query blocking behavior with answer/error responses, GET /health ok response, latency regression within 10% tolerance, endpoint coexistence without interference, MCP calls originating only from main process, tool names and id normalization unchanged from baseline, and MCP_URL configuration unchanged.
+
+All tests are listed in `stories/01-agent.md`, `stories/02-agent.md`, and `stories/03-agent.md`. Test counts align with breakdown and story verification sections: 8 + 15 + 9 = 32 total tests covering all 6 acceptance criteria.
