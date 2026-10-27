@@ -3,14 +3,14 @@
   "key": "PER-56",
   "source": "llm",
   "complexity": "moderate",
-  "summary": "Multi-step tool orchestration with bounded loop; requires detailed requirements, high-level loop design, breakdown into implementable stories, concrete file plan, and test cases.",
+  "summary": "Bounded multi-step agent loop with step limit: architect and designer rerun to change endpoint from /query to /query_given.",
   "track_hint": "standard",
   "steps": [
     {
       "node": "analyst",
       "activity": "requirements",
       "why": "Clarify loop semantics, step-limit behavior, and edge cases for the multi-step agent flow.",
-      "instructions": "Focus on the loop termination conditions (text answer vs step limit), what happens when max_steps is reached, and the exact message-history structure after each tool round.",
+      "instructions": "",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -19,7 +19,7 @@
       "node": "architect",
       "activity": "hld",
       "why": "Design the bounded agent loop with message flow, state transitions, and error handling before implementation.",
-      "instructions": "Detail the loop control flow, message-list evolution across steps, the final tools=None fallback, and how existing ValueError handling integrates with the new loop.",
+      "instructions": "Change the endpoint from /query to /query_given in all contracts and specifications.",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -28,7 +28,7 @@
       "node": "scrum_master",
       "activity": "breakdown",
       "why": "Split orchestrator changes, server config changes, and test expansion into ordered implementable stories.",
-      "instructions": "Separate the core loop logic, max_steps parameter and env var parsing, test updates, and README update into distinct stories that can be implemented and tested incrementally.",
+      "instructions": "",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -37,7 +37,7 @@
       "node": "designer",
       "activity": "lld",
       "why": "Concrete file plan for orchestrator.py and run_server changes, plus test expansion, before coding.",
-      "instructions": "Specify the exact loop structure in handle_query, where max_steps checking happens, AGENT_MAX_STEPS parsing in run_server, and which test cases cover the new paths.",
+      "instructions": "Update all endpoint references from /query to /query_given in file plans, route handlers, and test specifications.",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -46,7 +46,7 @@
       "node": "test_architect",
       "activity": "tests",
       "why": "Pin acceptance criteria as test cases, mapping loop scenarios and error conditions to test methods.",
-      "instructions": "Map each AC scenario (direct text, two-step chain, step limit with answer, step limit without answer, unknown tool on step 2, AGENT_MAX_STEPS parsing) to a test case with assertions on call counts and message structure.",
+      "instructions": "",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -76,7 +76,7 @@
       "instructions": "",
       "auto": true,
       "status": "pending",
-      "rerun": false
+      "rerun": true
     },
     {
       "node": "dev",
@@ -131,19 +131,47 @@
     }
   ],
   "suggested_roles": [],
-  "notes": [
-    "attempt 1: designer needs ['stories'] but no earlier step produces it (plan must produce stories: analyst `inline_story` or scrum_master)"
+  "notes": [],
+  "created_at": "2026-10-27T10:51:10.363848+00:00",
+  "version": 2,
+  "trigger": "review",
+  "gate": "architect_review",
+  "feedback": [
+    {
+      "id": "hub#1:inline-4387749082",
+      "source": "pr_inline",
+      "body": "change the endpoint to /query_given",
+      "author": "RoshanNawaz11",
+      "path": "features/PER-56/requirements.md",
+      "line": 65,
+      "pr": "hub#1"
+    }
   ],
-  "created_at": "2026-10-27T09:54:18.821015+00:00",
-  "version": 1,
-  "trigger": "ticket",
-  "gate": null,
-  "feedback": [],
   "feedback_errors": [],
-  "seen_feedback_ids": [],
-  "change_summary": "",
-  "changes": null,
-  "addressed": [],
+  "seen_feedback_ids": [
+    "hub#1:inline-4387749082"
+  ],
+  "change_summary": "Changed HTTP endpoint from /query to /query_given per inline feedback; architect and designer regenerate specs with the new endpoint.",
+  "changes": {
+    "added": [],
+    "removed": [],
+    "rerun": [
+      "architect",
+      "scrum_master",
+      "designer",
+      "test_architect",
+      "critic"
+    ],
+    "kept": [
+      "analyst"
+    ]
+  },
+  "addressed": [
+    {
+      "feedback_id": "hub#1:inline-4387749082",
+      "change": "Architect and designer rerun with endpoint /query_given instead of /query"
+    }
+  ],
   "unresolved_questions": [],
   "requires_review": false
 }
