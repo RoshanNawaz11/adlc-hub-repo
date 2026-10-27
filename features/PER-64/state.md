@@ -9,7 +9,7 @@ involved_repos:
 depends_on: []
 owner: regularinsaan
 lease_until: '2026-10-29T12:58:57.793701+00:00'
-revision: 45
+revision: 46
 hub_sha: null
 ticket_hash: e6cc6654bd53a634
 jira_hash: e6cc6654bd53a634
@@ -98,6 +98,9 @@ history:
 - node: critic
   note: exhausted; wrote change_requests.md
   at: '2026-10-27T13:19:56.427906+00:00'
+- node: critic
+  note: checkpoint push rejected
+  at: '2026-10-27T13:20:02.031640+00:00'
 ---
 
 # Feature state
