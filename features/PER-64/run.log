@@ -1,0 +1,17 @@
+2026-10-27T12:27:30.241517+00:00 heartbeat triage
+2026-10-27T12:28:08.718555+00:00 triage llm model=claude-haiku-4-5-20251001 in=73 out=4 usd=9.3e-05
+2026-10-27T12:28:08.814066+00:00 heartbeat triage
+2026-10-27T12:28:09.943153+00:00 triage llm model=claude-haiku-4-5-20251001 in=73 out=4 usd=9.3e-05
+2026-10-27T12:28:10.031072+00:00 heartbeat planner
+2026-10-27T12:28:26.594655+00:00 planner llm model=claude-sonnet-4-5-20250929 in=3423 out=702 usd=0.020799
+2026-10-27T12:28:35.743370+00:00 planner llm model=claude-sonnet-4-5-20250929 in=4176 out=796 usd=0.024468
+2026-10-27T12:28:35.828934+00:00 heartbeat analyst
+2026-10-27T12:28:35.840660+00:00 node start analyst
+2026-10-27T12:28:35.966830+00:00 heartbeat analyst
+2026-10-27T12:28:48.406406+00:00 analyst llm model=claude-sonnet-4-5-20250929 in=9829 out=732 usd=0.040467
+2026-10-27T12:28:48.532669+00:00 heartbeat analyst
+2026-10-27T12:28:55.876639+00:00 analyst llm model=claude-sonnet-4-5-20250929 in=10583 out=214 usd=0.034959
+2026-10-27T12:28:55.912451+00:00 node end analyst waiting=None
+2026-10-27T12:28:55.990077+00:00 heartbeat tpm_gate
+2026-10-27T12:28:56.002094+00:00 node start tpm_gate
+2026-10-27T12:29:17.116609+00:00 node end tpm_gate waiting=tpm_review
