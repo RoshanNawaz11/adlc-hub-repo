@@ -1,6 +1,6 @@
 # High-Level Design — PER-56
 
-**made from:** requirements.md  
+**made from:** requirements.md + review_feedback.md  
 **source:** Winston (system architect)  
 **altitude:** feature
 
@@ -9,6 +9,8 @@
 ## Executive summary
 
 This design replaces the orchestrator's single tool round with a **bounded agent loop**: the LLM may call tools, observe results, and call additional tools until it produces a text answer or exhausts a configurable step budget (`max_steps`). The loop preserves the existing tool-execution contract (validation, timeout, error codes) and message-history structure while removing the old `tools=None` synthesis call and its "synthesis loop detected" guard. The step limit acts as a safety rail: when reached, one final `tools=None` call attempts to force an answer; failure to produce text raises `RuntimeError`.
+
+**Change from prior version:** The HTTP endpoint is now `/query_given` (was `/query`). All contracts, specifications, and documentation refer to `/query_given`.
 
 ---
 
@@ -24,10 +26,11 @@ This design replaces the orchestrator's single tool round with a **bounded agent
 - Existing `ValueError` handling (unknown tool, missing field) unchanged; HTTP status codes unchanged.
 - Test expansion: direct text, two-step chain, step-limit scenarios, unknown-tool-on-step-2, `AGENT_MAX_STEPS` parsing.
 - README update: environment variable table and one-sentence capability description.
+- **HTTP endpoint:** `/query_given` (all references updated from `/query`).
 
 ### Out of scope
 
-- Conversation memory across `/query` requests.
+- Conversation memory across `/query_given` requests.
 - Streaming responses.
 - Any changes to `mcp_client.py` or the MCP server.
 
@@ -130,7 +133,7 @@ except (ValueError, TypeError):
 
 **Prevents:** Changing the error-code contract for existing callers vs new step-limit errors getting a different code.
 
-**Rule:** The existing `try/except` structure in the HTTP handler (`/query` endpoint) already maps `ValueError` → 400 and catches all other exceptions → 500. No changes needed; the new `RuntimeError` naturally falls into the 500 path.
+**Rule:** The existing `try/except` structure in the HTTP handler (`/query_given` endpoint) already maps `ValueError` → 400 and catches all other exceptions → 500. No changes needed; the new `RuntimeError` naturally falls into the 500 path.
 
 **[ADOPTED]** — existing error-handling code is unchanged; new error types map to existing status codes.
 
@@ -166,13 +169,25 @@ Where `tool_names` is `[call["name"] for call in tool_use_content]` (the list of
 
 ---
 
+### AD-7: HTTP endpoint change to /query_given
+
+**Binds:** The HTTP endpoint for agent queries is `/query_given` (changed from `/query`). All API contracts, route handlers, test fixtures, and documentation refer to `/query_given`.
+
+**Prevents:** Two implementations built independently could use different endpoint paths, breaking client integrations.
+
+**Rule:** Route handler registration uses `@app.route("/query_given", methods=["POST"])`. Client examples, test requests, and README documentation all reference `/query_given`. No `/query` route exists.
+
+**[ADOPTED]** — review feedback requires this change; it affects HTTP layer only, not orchestrator logic.
+
+---
+
 ## System structure
 
 ### Component view
 
 ```mermaid
 graph TD
-    HTTP["/query endpoint"]
+    HTTP["/query_given endpoint"]
     ORCH["Orchestrator.handle_query"]
     LLM["llm_client.infer"]
     MCP["mcp_client (tool execution)"]
@@ -188,7 +203,7 @@ graph TD
     style MCP fill:#ffe1e1
 ```
 
-**Orchestrator** owns the loop. **LLM client** is called repeatedly with the evolving message list. **MCP client** is called once per tool round (after validation, before appending tool results). HTTP layer is unchanged except for passing `max_steps` from env var.
+**Orchestrator** owns the loop. **LLM client** is called repeatedly with the evolving message list. **MCP client** is called once per tool round (after validation, before appending tool results). HTTP layer is unchanged except for passing `max_steps` from env var and the endpoint path (`/query_given`).
 
 ---
 
@@ -264,7 +279,7 @@ If step 3 had been `tool_use` again and `max_steps=2`, the orchestrator would ma
 
 ## Data contracts
 
-### Constructor signature (Orchestrator)
+### Orchestrator constructor signature (modified)
 
 ```python
 class Orchestrator:
@@ -289,6 +304,18 @@ class Orchestrator:
 **Default:** `"5"` (used when env var is absent or invalid)  
 **Valid values:** `"1"`, `"2"`, ..., `"99"` (any positive integer string)  
 **Invalid values:** `""`, `"0"`, `"-1"`, `"foo"`, `"3.5"` → log warning, use default `5`.
+
+---
+
+### HTTP endpoint contract
+
+**Endpoint:** `POST /query_given`  
+**Request body:** `{"query": "<user question>"}`  
+**Response (success):** `200 OK`, body: `{"answer": "<text answer>"}`  
+**Response (validation error):** `400 Bad Request`, body: `{"error": "<ValueError message>"}`  
+**Response (other error):** `500 Internal Server Error`, body: `{"error": "<RuntimeError or other exception message>"}`
+
+**Change from prior version:** Endpoint path is `/query_given` (was `/query`).
 
 ---
 
@@ -359,7 +386,7 @@ None.
 ## Deferred decisions
 
 - **Per-query timeout:** Not implemented. The per-tool 10s timeout is reused. Future work can add a query-level timeout if needed.
-- **Conversation memory across requests:** Out of scope. Each `/query` request is stateless.
+- **Conversation memory across requests:** Out of scope. Each `/query_given` request is stateless.
 - **Streaming responses:** Out of scope. The orchestrator returns the final text synchronously.
 - **Adaptive step limit:** Not implemented. `max_steps` is fixed per deployment. Future work could let the LLM signal "I need more steps" vs "I'm stuck" to adjust the limit dynamically.
 
@@ -399,6 +426,8 @@ Mock `os.environ` to test `AGENT_MAX_STEPS` parsing.
 1. Valid value `"3"` → `Orchestrator` instantiated with `max_steps=3`.
 2. Invalid values `"foo"`, `"-1"`, `""` → warning logged, `Orchestrator` instantiated with `max_steps=5`.
 
+**Note:** Test HTTP requests to `/query_given` endpoint (not `/query`).
+
 ### Integration / manual tests
 
 - **AC-7:** Run `pytest` and confirm old "synthesis loop detected" test is removed or updated.
@@ -422,6 +451,16 @@ Add row:
 
 > The orchestrator supports multi-step tool use, allowing the LLM to call tools, see results, and call additional tools until it produces an answer or reaches the step limit.
 
+### API endpoint documentation
+
+Update any endpoint references from `/query` to `/query_given`. Example request:
+
+```bash
+curl -X POST http://localhost:8000/query_given \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Who is EMP-001'\''s manager?"}'
+```
+
 ---
 
 ## Verification checklist
@@ -430,6 +469,7 @@ Add row:
 - [ ] All unit tests in `test_http_server.py` pass (AC-6).
 - [ ] Old synthesis-loop test removed or updated (AC-7).
 - [ ] README updated with `AGENT_MAX_STEPS` and capability description (AC-8).
+- [ ] README and test fixtures reference `/query_given` endpoint (not `/query`).
 - [ ] `python -m pytest -q` exits 0 (all tests pass).
 - [ ] Manual review: HTTP status codes unchanged (400 for `ValueError`, 500 for other errors, 200 for success).
 - [ ] Manual review: no changes to `mcp_client.py` or MCP server.

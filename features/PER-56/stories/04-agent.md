@@ -1,57 +1,72 @@
 # Tech Spec — Story 04-agent
 
 **ticket:** 04-agent  
-**title:** Document AGENT_MAX_STEPS and multi-step capability in README  
-**story points:** 2  
-**made from:** PER-56 requirements + HLD + breakdown  
+**title:** Document AGENT_MAX_STEPS, multi-step capability, and /query_given endpoint in README  
+**story points:** 1  
+**made from:** PER-56 requirements + HLD + breakdown + review_feedback.md  
 **source:** designer (LLD)
+
+---
+
+## Overview
+
+Add `AGENT_MAX_STEPS` to the environment-variables table in the README with its description and default value. Add one sentence describing the multi-step tool-use capability. Update all API endpoint documentation and examples from `/query` to `/query_given`. This ensures operators and developers know about the new configuration option, feature, and endpoint path.
+
+This story implements AC-8 (README updated) and the endpoint path documentation change from `review_feedback.md`. It depends on Story 2 (which added `AGENT_MAX_STEPS` env var parsing and updated the HTTP route to `/query_given`) and Story 3 (which verified the loop behavior with tests). No code changes are made in this story—only documentation updates.
+
+---
+
+## Stack
+
+- **Language:** Markdown (README.md)
+- **No code changes:** This story is documentation-only.
 
 ---
 
 ## Acceptance criteria
 
-From requirements.md and breakdown.md:
+From requirements.md and breakdown.md, this story covers:
 
-1. **Environment-variables table includes AGENT_MAX_STEPS:** README contains a row for `AGENT_MAX_STEPS` with description "Maximum tool-use steps before forcing a final answer" and default value `5`.
-2. **Capability description present:** README includes one sentence describing the multi-step tool-use capability: "The orchestrator supports multi-step tool use, allowing the LLM to call tools, see results, and call additional tools until it produces an answer or reaches the step limit."
+- **AC-8:** README updated:
+  - Environment-variables table includes `AGENT_MAX_STEPS` row with description and default `5`.
+  - Capability description sentence present: "The orchestrator supports multi-step tool use, allowing the LLM to call tools, see results, and call additional tools until it produces an answer or reaches the step limit."
+  - All API endpoint documentation references `/query_given` (not `/query`), including curl examples and route descriptions.
+
+These ACs map to 3 manual checks during review.
 
 ---
 
-## File plan
+## Files to create / modify
 
 ### Files to modify
 
 1. **`README.md`**
-   - **Lines affected:** ~5–10
-   - **Changes:**
-     - Add `AGENT_MAX_STEPS` row to environment-variables table (create table if it does not exist).
-     - Add one sentence describing multi-step tool-use capability to existing "Features" section, or create a "Capabilities" section if no suitable section exists.
-     - Match existing README style (capitalization, punctuation, markdown formatting).
+   - **Change:** Add `AGENT_MAX_STEPS` to environment-variables table (or create table if it does not exist).
+   - **Change:** Add one-sentence capability description to "Features" section (or create "Capabilities" section if needed).
+   - **Change:** Update all API endpoint documentation from `/query` to `/query_given` (route references, curl examples, any endpoint descriptions).
+   - **Lines affected:** ~8–12 lines (table row + sentence + endpoint path updates in multiple places).
 
-### Files to read (context only, no changes)
+### Files to read (context only)
 
-- **`README.md`** — scan for existing environment-variables table, "Features" section, or similar documentation structure to determine where to add new content.
+- **`README.md`** (existing content, structure, formatting conventions).
+- **`requirements.md`** (AC-8 wording for capability description).
+- **`hld.md`** (README updates section for exact table row and sentence wording).
 
 ---
 
 ## Interfaces
 
-### Environment-variables table format
+### Environment variables table (new or updated section)
 
-**If table exists:**
-
-Append new row to existing table:
+**If table exists:** Add new row:
 
 ```markdown
 | Variable | Description | Default |
 |----------|-------------|---------|
-| (existing rows...) |  |  |
 | `AGENT_MAX_STEPS` | Maximum tool-use steps before forcing a final answer | `5` |
 ```
 
-**If table does not exist:**
-
-Create new table with header and `AGENT_MAX_STEPS` row:
+**If table does not exist:** Create new section:
 
 ```markdown
 ## Environment Variables
@@ -61,166 +76,351 @@ Create new table with header and `AGENT_MAX_STEPS` row:
 | `AGENT_MAX_STEPS` | Maximum tool-use steps before forcing a final answer | `5` |
 ```
 
-**Key points:**
-
-- Use backticks around variable name: `` `AGENT_MAX_STEPS` ``.
-- Description is a complete sentence (no trailing period, to match common table style).
-- Default value is in backticks: `` `5` ``.
-- Table uses standard markdown pipe format with header separator (`|---|---|---|`).
+**Placement:** Near other configuration documentation (e.g., after "Installation" or "Usage" section, or in a dedicated "Configuration" section).
 
 ---
 
-### Capability description format
+### Capability description (new or updated section)
 
-**If "Features" section exists:**
+**Sentence to add:**
 
-Append sentence to existing list or paragraph:
+> The orchestrator supports multi-step tool use, allowing the LLM to call tools, see results, and call additional tools until it produces an answer or reaches the step limit.
+
+**Placement options:**
+
+1. **Existing "Features" section:** Append as a new bullet or paragraph.
+2. **Existing "Usage" section:** Add as a paragraph describing the behavior.
+3. **New "Capabilities" section:** Create if no suitable section exists.
+
+**Example (Features section):**
 
 ```markdown
 ## Features
 
-- (existing features...)
-- The orchestrator supports multi-step tool use, allowing the LLM to call tools, see results, and call additional tools until it produces an answer or reaches the step limit.
+- Single-step tool execution (legacy behavior)
+- Multi-step tool use: The orchestrator supports multi-step tool use, allowing the LLM to call tools, see results, and call additional tools until it produces an answer or reaches the step limit.
+- Error handling with appropriate HTTP status codes (400 for validation errors, 500 for other errors)
 ```
 
-**If no suitable section exists:**
+---
 
-Create new "Capabilities" section:
+### API endpoint documentation updates
 
-```markdown
-## Capabilities
+**Find and replace all occurrences of `/query` with `/query_given`:**
 
-The orchestrator supports multi-step tool use, allowing the LLM to call tools, see results, and call additional tools until it produces an answer or reaches the step limit.
-```
+**Example locations to update:**
 
-**Key points:**
+1. **Endpoint description:**
+   ```markdown
+   ### POST /query_given
+   
+   Query the agent with a natural-language question.
+   ```
 
-- Sentence is exactly as specified in requirements (do not paraphrase).
-- Capitalization: "The orchestrator" (lowercase "o" if mid-sentence), "LLM" (uppercase).
-- Period at end of sentence.
-- If section uses bulleted list, add as bullet; if prose, append as paragraph.
+2. **curl examples:**
+   ```bash
+   curl -X POST http://localhost:8000/query_given \
+     -H "Content-Type: application/json" \
+     -d '{"query": "Who is EMP-001'\''s manager?"}'
+   ```
+
+3. **Route registration notes (if present):**
+   ```markdown
+   The server registers a single route: `POST /query_given`.
+   ```
+
+4. **Any example responses or usage documentation referencing the endpoint.**
+
+**Search pattern:** Look for `/query` (with surrounding context to distinguish from internal function names like `handle_query`).
+
+**Note:** Do not change internal function/method names (e.g., `handle_query` in code examples stays as-is). Only change HTTP endpoint paths in API documentation.
 
 ---
 
 ## Algorithm notes
 
-### Locating insertion points
+### Documentation structure conventions
 
-**Environment-variables table:**
+**Environment variables table:**
 
-1. Search README for existing table with headers like "Environment Variables", "Configuration", or "Env Vars".
-2. If found, locate last row and append new row after it.
-3. If not found, create new "## Environment Variables" section (suggest placement: after "## Installation" or "## Usage", before "## Development").
-
-**Capability description:**
-
-1. Search README for sections like "## Features", "## Capabilities", "## Overview", "## Usage".
-2. If "Features" section exists (most likely), append sentence as bullet or paragraph.
-3. If no suitable section exists, create new "## Capabilities" section (suggest placement: after "## Overview" or before "## Installation").
-
-### Style matching
-
-1. Read existing README headers to determine heading level (usually `##` for main sections).
-2. Read existing lists to determine bullet style (`-` vs `*`).
-3. Read existing variable names in text to confirm backtick usage (e.g., `` `PORT` `` vs `PORT`).
-4. Match capitalization of existing headings ("Environment Variables" vs "Environment variables").
-
----
-
-## Tests
-
-### Test 1: Environment-variables table includes AGENT_MAX_STEPS (AC-1)
-
-**Manual verification:**
-
-**Action:**
-
-1. Open `README.md` in text editor.
-2. Locate environment-variables table (or new "Environment Variables" section if created).
-3. Verify row exists with exact content:
-   ```
-   | `AGENT_MAX_STEPS` | Maximum tool-use steps before forcing a final answer | `5` |
-   ```
-
-**Pass criteria:**
-
-- Row is present in table.
-- Variable name is `` `AGENT_MAX_STEPS` `` (with backticks).
-- Description is exactly "Maximum tool-use steps before forcing a final answer" (no typos, no paraphrasing).
-- Default value is `` `5` `` (with backticks).
-- Table is well-formed (pipes align, header separator present).
-
----
-
-### Test 2: Capability description present (AC-2)
-
-**Manual verification:**
-
-**Action:**
-
-1. Open `README.md` in text editor.
-2. Locate "Features" section (or new "Capabilities" section if created).
-3. Verify sentence is present:
-   > The orchestrator supports multi-step tool use, allowing the LLM to call tools, see results, and call additional tools until it produces an answer or reaches the step limit.
-
-**Pass criteria:**
-
-- Sentence is present in README.
-- Text is **exactly** as specified (word-for-word, no paraphrasing).
-- Capitalization is correct ("The orchestrator", "LLM").
-- Sentence ends with period.
-- Formatting matches surrounding text (bullet vs paragraph, heading level).
-
----
-
-## Implementation checklist
-
-- [ ] Read existing `README.md` to locate environment-variables table (or determine where to create it).
-- [ ] Add `AGENT_MAX_STEPS` row to environment-variables table (or create table if it does not exist).
-- [ ] Read existing `README.md` to locate "Features" section (or determine where to create "Capabilities" section).
-- [ ] Add capability description sentence to "Features" section (or create "Capabilities" section if needed).
-- [ ] Match existing README style (heading levels, bullet style, capitalization).
-- [ ] Perform Test 1 (Manual Verification AC-1: environment-variables table).
-- [ ] Perform Test 2 (Manual Verification AC-2: capability description sentence).
-
----
-
-## Notes
-
-### Dependency on Story 01-agent, Story 02-agent, Story 03-agent
-
-This story documents the feature implemented in Stories 01–03. All three prior stories must be complete (loop logic, env var parsing, tests) before this documentation is accurate. If Stories 01–03 are not complete, the README will describe functionality that does not yet exist.
-
-### No automated tests
-
-This story has no automated tests. Verification is manual (Test 1 and Test 2 above). The implementation is trivial (add 5 lines to README), so manual verification is sufficient and appropriate.
-
-### Style consistency
-
-The README may have existing conventions (e.g., all env vars in a single table, features as bulleted list, specific heading capitalization). Follow existing conventions rather than inventing new ones. If the README is empty or minimal, use the formats specified in "Interfaces" above.
-
-### Placement suggestions
-
-**Environment-variables table:**
-
-- **Best:** After "## Installation" or "## Usage" section (operators need to know config before running).
-- **Acceptable:** Before "## Development" section (config is operational, not dev-only).
-- **Avoid:** At end of README (operators may not scroll that far).
+- Use consistent column headers: `| Variable | Description | Default |`
+- Align columns with pipes (`|`) for readability (Markdown rendering ignores alignment, but it helps human readers).
+- Use backticks for variable names: `` `AGENT_MAX_STEPS` ``
+- Use sentence case for descriptions, end with period.
 
 **Capability description:**
 
-- **Best:** In existing "## Features" section (most natural fit).
-- **Acceptable:** In "## Overview" or "## Usage" section (describes what the service does).
-- **Avoid:** In "## Development" section (capability is user-facing, not dev-only).
+- Match the tone and style of existing feature descriptions (if any).
+- Keep it concise: one sentence is sufficient per requirements.
+- Use present tense ("supports", not "will support").
+
+**Endpoint path updates:**
+
+- Use literal paths in examples: `/query_given`, not `<endpoint>` or `{endpoint}`.
+- Update both the endpoint definition (e.g., `### POST /query_given`) and all usage examples (curl commands, client code snippets).
+
+---
+
+## Verification Approach
+
+Manual review of `README.md` diff. No automated tests (this is a documentation-only story).
+
+### Check 1: Environment-variables table includes AGENT_MAX_STEPS row
+
+**Action:**
+
+- Open `README.md` and locate the environment-variables table (or verify it was created if it did not exist).
+- Verify the table includes a row for `AGENT_MAX_STEPS`.
+
+**Expected content:**
+
+```markdown
+| `AGENT_MAX_STEPS` | Maximum tool-use steps before forcing a final answer | `5` |
+```
+
+**Pass criteria:**
+
+- Row exists in table.
+- Variable name is `` `AGENT_MAX_STEPS` `` (backticks, correct spelling).
+- Description matches expected wording (exact match not required, but meaning must be clear).
+- Default value is `5`.
+
+---
+
+### Check 2: Capability description sentence present
+
+**Action:**
+
+- Locate the "Features", "Usage", or "Capabilities" section in `README.md`.
+- Verify the multi-step tool-use capability is described.
+
+**Expected content (approximate):**
+
+> The orchestrator supports multi-step tool use, allowing the LLM to call tools, see results, and call additional tools until it produces an answer or reaches the step limit.
+
+**Pass criteria:**
+
+- Sentence exists in a visible section (not hidden in implementation details or comments).
+- Meaning matches expected description (exact wording can vary slightly if it's clearer).
+- Placed in a logical section (Features, Usage, or new Capabilities section).
+
+---
+
+### Check 3: All endpoint references use /query_given
+
+**Action:**
+
+- Search `README.md` for all occurrences of `/query` (case-insensitive).
+- Verify each occurrence is either:
+  1. Updated to `/query_given` (for HTTP endpoint references).
+  2. Left as-is (for internal function names like `handle_query`).
+
+**Expected updates:**
+
+- Endpoint definitions: `### POST /query_given`
+- curl examples: `http://localhost:8000/query_given`
+- Route descriptions: "registers a single route: `POST /query_given`"
+
+**Pass criteria:**
+
+- No HTTP endpoint references to `/query` remain.
+- Internal function/method names (e.g., `handle_query`, `orchestrator.handle_query()`) are unchanged.
+- At least one curl example references `/query_given`.
+
+---
+
+## Edge cases / failure modes
+
+### Edge case 1: Environment-variables table does not exist
+
+**Scenario:** `README.md` has no existing environment-variables section or table.
+
+**Behavior:** Create a new section with the table headers and the `AGENT_MAX_STEPS` row.
+
+**Verification:** Check 1 verifies the table exists and includes the row.
+
+---
+
+### Edge case 2: Multiple sections could host the capability description
+
+**Scenario:** `README.md` has both "Features" and "Usage" sections, and it's unclear where to place the sentence.
+
+**Behavior:** Choose the section that best fits the content. "Features" is preferred if it lists product capabilities. "Usage" is acceptable if it describes how to use the service.
+
+**Verification:** Check 2 verifies the sentence exists in *some* visible section; exact placement is flexible.
+
+---
+
+### Edge case 3: Existing /query references are in code comments or filenames
+
+**Scenario:** `README.md` references `/query` in a code comment (e.g., `# Old endpoint: /query`) or in a changelog entry.
+
+**Behavior:** Update code comments if they describe the current endpoint. Leave changelog entries unchanged (historical references are intentionally preserved).
+
+**Verification:** Check 3 verifies no *HTTP endpoint references* to `/query` remain; historical/comment references can stay if clearly marked as legacy.
+
+---
+
+## Risks
+
+### RISK-1: Incomplete endpoint path updates
+
+**Likelihood:** Medium (README may have multiple endpoint references)  
+**Impact:** High (developers may use wrong endpoint path)  
+**Mitigation (implemented):** Check 3 explicitly verifies all `/query` references are updated or justified.  
+**Residual risk:** Obscure references (e.g., in image URLs or external links) may be missed. Acceptance: manual review catches most cases; users report any remaining issues.
+
+---
+
+### RISK-2: Inconsistent formatting breaks table rendering
+
+**Likelihood:** Low (Markdown is forgiving)  
+**Impact:** Low (table may render incorrectly but content is still readable)  
+**Mitigation (implemented):** Use standard Markdown table syntax (pipes and dashes). Test rendering locally if possible.  
+**Residual risk:** Some Markdown renderers have quirks. Acceptance: standard syntax works in most tools; can be fixed in a follow-up if an issue is reported.
+
+---
+
+### RISK-3: Capability description is too verbose or unclear
+
+**Likelihood:** Low (sentence is short and clear)  
+**Impact:** Low (users may need to re-read it)  
+**Mitigation (implemented):** Use exact wording from requirements.md AC-8, which was reviewed by the architect.  
+**Residual risk:** Some users may want more detail. Acceptance: one sentence is sufficient per requirements; more detail can be added in a follow-up story if needed.
+
+---
+
+## Dependencies
+
+- **Story 1:** Loop logic implemented; README documents the behavior that now exists.
+- **Story 2:** `AGENT_MAX_STEPS` env var and `/query_given` endpoint implemented; README documents how to configure and use them.
+- **Story 3:** Tests verify the loop behavior; README documents the tested capability.
+- **Existing:** `README.md` (structure, formatting conventions).
+
+No new external dependencies.
+
+---
+
+## Implementation notes
+
+- **Search and replace:** Use a text editor's "find all" to locate `/query` references. Verify each match before updating (don't blindly replace).
+- **Table formatting:** Markdown tables use pipes (`|`) to separate columns and dashes (`---`) for the header separator. Ensure at least three dashes per column.
+- **Sentence placement:** If uncertain where to place the capability description, create a new "Capabilities" section at the top level (e.g., after "Installation" and before "Usage").
+- **Consistency:** Match the existing README's capitalization (e.g., "Features" vs "FEATURES"), punctuation, and markdown style (e.g., ATX-style headers `##` vs Setext-style).
+- **No code changes:** This story modifies only `README.md`. If you find yourself editing Python files, stop and re-read the story description.
+
+---
+
+## Out of scope for this story
+
+- **Code changes:** Stories 1, 2, and 3 implemented the code; this story is documentation-only.
+- **Test changes:** Story 3 added tests; this story does not modify test files.
+- **Release notes:** Out of scope; README is user-facing docs, not a changelog.
+- **Example projects or tutorials:** Out of scope; README provides reference documentation, not a step-by-step guide.
 
 ---
 
 ## Verification checklist
 
-- [ ] `README.md` contains environment-variables table (existing or new).
-- [ ] Table includes `AGENT_MAX_STEPS` row with correct description and default value.
-- [ ] `README.md` contains "Features" or "Capabilities" section (existing or new).
-- [ ] Section includes multi-step capability description sentence (exact wording).
-- [ ] New content matches existing README style (heading levels, bullet style, capitalization).
-- [ ] Test 1 passed (AC-1: env var table).
-- [ ] Test 2 passed (AC-2: capability description).
+- [ ] Environment-variables table exists in `README.md` (Check 1).
+- [ ] Table includes `AGENT_MAX_STEPS` row with description and default `5` (Check 1).
+- [ ] Capability description sentence present in "Features", "Usage", or "Capabilities" section (Check 2).
+- [ ] Sentence matches expected meaning: multi-step tool use with step limit (Check 2).
+- [ ] All HTTP endpoint references updated from `/query` to `/query_given` (Check 3).
+- [ ] At least one curl example uses `/query_given` (Check 3).
+- [ ] Internal function names (e.g., `handle_query`) unchanged (Check 3).
+- [ ] Manual review: table formatting renders correctly (if local preview available).
+- [ ] Manual review: no broken links or missing sections after updates.
+
+---
+
+## Tests
+
+Per breakdown.md verification approach and AC-8, this story has **3 manual verification checks** and **0 automated tests**.
+
+### Manual Check 1: Environment-variables table includes AGENT_MAX_STEPS row (AC-8.1)
+
+**Action:**
+
+- Open `README.md` and locate the environment-variables table (or verify it was created if it did not exist).
+- Verify the table includes a row for `AGENT_MAX_STEPS`.
+
+**Expected content:**
+
+```markdown
+| `AGENT_MAX_STEPS` | Maximum tool-use steps before forcing a final answer | `5` |
+```
+
+**Pass criteria:**
+
+- Row exists in table.
+- Variable name is `` `AGENT_MAX_STEPS` `` (backticks, correct spelling).
+- Description matches expected wording (exact match not required, but meaning must be clear).
+- Default value is `5`.
+
+**Maps to:** AC-8 (README environment-variables table)
+
+---
+
+### Manual Check 2: Capability description sentence present (AC-8.2)
+
+**Action:**
+
+- Locate the "Features", "Usage", or "Capabilities" section in `README.md`.
+- Verify the multi-step tool-use capability is described.
+
+**Expected content (approximate):**
+
+> The orchestrator supports multi-step tool use, allowing the LLM to call tools, see results, and call additional tools until it produces an answer or reaches the step limit.
+
+**Pass criteria:**
+
+- Sentence exists in a visible section (not hidden in implementation details or comments).
+- Meaning matches expected description (exact wording can vary slightly if it's clearer).
+- Placed in a logical section (Features, Usage, or new Capabilities section).
+
+**Maps to:** AC-8 (README capability description)
+
+---
+
+### Manual Check 3: All endpoint references use /query_given (AC-8.3)
+
+**Action:**
+
+- Search `README.md` for all occurrences of `/query` (case-insensitive).
+- Verify each occurrence is either:
+  1. Updated to `/query_given` (for HTTP endpoint references).
+  2. Left as-is (for internal function names like `handle_query`).
+
+**Expected updates:**
+
+- Endpoint definitions: `### POST /query_given`
+- curl examples: `http://localhost:8000/query_given`
+- Route descriptions: "registers a single route: `POST /query_given`"
+
+**Pass criteria:**
+
+- No HTTP endpoint references to `/query` remain.
+- Internal function/method names (e.g., `handle_query`, `orchestrator.handle_query()`) are unchanged.
+- At least one curl example references `/query_given`.
+
+**Maps to:** AC-8 (README endpoint documentation), review_feedback.md (endpoint path change)
+
+---
+
+## Acceptance criteria (mapped to verification checks)
+
+- **AC-8:** README updated:
+  - Environment-variables table includes `AGENT_MAX_STEPS` row with description and default `5`. → **Manual Check 1**
+  - Capability description sentence present: "The orchestrator supports multi-step tool use, allowing the LLM to call tools, see results, and call additional tools until it produces an answer or reaches the step limit." → **Manual Check 2**
+  - All API endpoint documentation references `/query_given` (not `/query`), including curl examples and route descriptions. → **Manual Check 3**
+
+**Verification count:** 3 manual checks (matches breakdown.md count for Story 4)
+
+---
+
+## Notes
+
+- **No automated tests:** This is a documentation-only story; all verification is manual review of `README.md` changes.
+- **Maps to breakdown.md:** Story 4 has 0 automated tests and 3 manual checks per breakdown.md verification summary.
+- **Consistency with other stories:** Stories 1–3 have automated unit tests; Story 4 is the only documentation-only story in the breakdown.

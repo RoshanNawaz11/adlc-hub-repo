@@ -1,54 +1,56 @@
 # Tech Spec — Story 02-agent
 
 **ticket:** 02-agent  
-**title:** Add AGENT_MAX_STEPS environment variable parsing  
+**title:** Add AGENT_MAX_STEPS environment variable parsing and update endpoint to /query_given  
 **story points:** 3  
-**made from:** PER-56 requirements + HLD + breakdown  
+**made from:** PER-56 requirements + HLD + breakdown + review_feedback.md  
 **source:** designer (LLD)
+
+---
+
+## Overview
+
+Read `AGENT_MAX_STEPS` from the environment in `run_server`, validate it as a positive integer, and pass it to the `Orchestrator` constructor. If the value is invalid (non-integer, non-positive, or empty), log a warning and use the default value `5`. This allows operators to tune the step limit per deployment without code changes. Additionally, update the HTTP route handler from `/query` to `/query_given` per review feedback.
+
+This story implements FR-3 (step limit configuration) and the endpoint path change from `review_feedback.md`. It depends on Story 1 (which added the `max_steps` parameter to `Orchestrator.__init__`). Story 3 will expand test coverage for the full loop behavior, and Story 4 will document the new env var and endpoint in the README.
+
+---
+
+## Stack
+
+- **Language:** Python 3.11+
+- **Framework:** None (synchronous request handler)
+- **HTTP server:** `run_server` (existing, instantiates `Orchestrator` and registers routes)
+- **Test framework:** `pytest`
+- **Logging:** `logging` module (existing)
 
 ---
 
 ## Acceptance criteria
 
-From requirements.md and breakdown.md:
+From requirements.md and breakdown.md, this story covers:
 
-1. **Valid AGENT_MAX_STEPS:** When the environment variable is a valid positive integer (e.g., `"3"`), `Orchestrator` is instantiated with `max_steps=3` and no warning is logged.
-2. **Invalid AGENT_MAX_STEPS:** When the environment variable is invalid (non-integer, non-positive, empty, or decimal), `Orchestrator` is instantiated with `max_steps=5` and a warning is logged: `"Invalid AGENT_MAX_STEPS, using default 5"`.
+- **AC-6:** `AGENT_MAX_STEPS` parsing:
+  - Valid positive integer (e.g., `"3"`) → `Orchestrator` instantiated with `max_steps=3`, no warning logged.
+  - Invalid values (`"foo"`, `"-1"`, `""`, `"3.5"`) → `Orchestrator` instantiated with `max_steps=5`, warning logged.
+- **Endpoint path change (review_feedback.md):** HTTP route handler updated from `/query` to `/query_given`.
 
----
-
-## File plan
-
-### Files to modify
-
-1. **`app/run_server.py`**
-   - **Lines affected:** ~10–15
-   - **Changes:**
-     - Add `import os` at top if not already present.
-     - Add `import logging` at top if not already present; get logger: `logger = logging.getLogger(__name__)`.
-     - Before instantiating `Orchestrator`, parse `AGENT_MAX_STEPS` from `os.environ.get("AGENT_MAX_STEPS", "")`.
-     - Validate: if non-empty, parse as `int`; if `<= 0`, raise `ValueError`. Catch `ValueError`/`TypeError` and log warning, use default `5`.
-     - Pass `max_steps=<parsed_value>` to `Orchestrator(...)` constructor call.
-
-2. **`tests/test_http_server.py`** (or `tests/test_run_server.py` if that file exists)
-   - **Lines affected:** ~30–50
-   - **Changes:**
-     - Add 2 new test cases (AC 1–2 above).
-     - Mock `os.environ` to control `AGENT_MAX_STEPS` value.
-     - Mock `Orchestrator` constructor to capture `max_steps` argument.
-     - Mock `logger.warning` to verify warning is logged for invalid values.
-
-### Files to read (context only, no changes)
-
-- **`app/agent/orchestrator.py`** — existing `__init__` signature with `max_steps` parameter (added in Story 01-agent).
+These ACs map to 3 unit tests in `tests/test_http_server.py` (or `tests/test_run_server.py`).
 
 ---
 
-## Interfaces
+## Schema / API contracts
 
-### Environment variable parsing logic (run_server.py)
+### Environment variable (new)
 
-**Algorithm:**
+**Name:** `AGENT_MAX_STEPS`  
+**Type:** string (parsed as positive integer in `run_server`)  
+**Default:** `"5"` (when absent or invalid)  
+**Valid values:** `"1"`, `"2"`, ..., `"99"`, etc. (any string that parses as a positive int)  
+**Invalid values:** `"0"`, `"-1"`, `"foo"`, `"3.5"` → log warning, use default `5`  
+**Absent (`""` or not set):** Use default `5`, no warning (env var not set is normal)
+
+Parsing logic in `run_server`:
 
 ```python
 import os
@@ -56,7 +58,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Parse AGENT_MAX_STEPS (before Orchestrator instantiation)
+# Parse AGENT_MAX_STEPS before instantiating Orchestrator
 try:
     raw = os.environ.get("AGENT_MAX_STEPS", "")
     if raw:
@@ -69,255 +71,358 @@ except (ValueError, TypeError):
     logger.warning("Invalid AGENT_MAX_STEPS, using default 5")
     max_steps = 5
 
-# Instantiate Orchestrator with parsed max_steps
+# Pass max_steps to Orchestrator constructor
 orchestrator = Orchestrator(
     llm_client=llm_client,
     mcp_client=mcp_client,
     tools=tools,
-    max_steps=max_steps  # <-- PASS PARSED VALUE
+    max_steps=max_steps  # NEW ARGUMENT
 )
 ```
 
 **Key points:**
 
-- `os.environ.get("AGENT_MAX_STEPS", "")` returns empty string if env var is not set.
-- Empty string → use default `5` **without warning** (not treated as invalid).
-- Non-empty string → parse as `int()`. If `int()` fails or result `<= 0`, catch exception and use default `5` **with warning**.
-- `ValueError` catches both `int()` parse failures and the explicit `raise ValueError` for non-positive values.
-- `TypeError` catches edge cases where the env var is somehow not a string (defensive).
+- `os.environ.get("AGENT_MAX_STEPS", "")` returns empty string `""` if env var is not set.
+- Empty string (`""`) is treated as "not set" → use default `5` without warning.
+- Non-empty invalid values (e.g., `"foo"`, `"-1"`) trigger warning and use default `5`.
+- Positive integers (e.g., `"3"`) are parsed and passed to `Orchestrator`.
 
 ---
 
-### Orchestrator constructor call (run_server.py)
+### HTTP endpoint contract (updated)
 
-**Before (Story 01-agent):**
+**Endpoint:** `POST /query_given` (was `/query`)  
+**Request body:** `{"query": "<user question>"}`  
+**Response (success):** `200 OK`, body: `{"answer": "<text answer>"}`  
+**Response (validation error):** `400 Bad Request`, body: `{"error": "<ValueError message>"}`  
+**Response (other error):** `500 Internal Server Error`, body: `{"error": "<RuntimeError or other exception message>"}`
+
+**Change from prior version:** Route handler path is `/query_given` (was `/query`). Route registration:
 
 ```python
-orchestrator = Orchestrator(
-    llm_client=llm_client,
-    mcp_client=mcp_client,
-    tools=tools
-    # max_steps defaults to 5 in __init__
-)
+@app.route("/query_given", methods=["POST"])
+def query_given():
+    # existing handler logic (unchanged)
+    ...
 ```
 
-**After (Story 02-agent):**
+No `/query` route exists after this story. Requests to `POST /query` will return `404 Not Found`.
+
+---
+
+## Files to create / modify
+
+### Files to modify
+
+1. **`app/run_server.py`**
+   - **Change:** Add `import os` and `import logging` at top (if not already present).
+   - **Change:** Parse `AGENT_MAX_STEPS` from `os.environ` before instantiating `Orchestrator` (see parsing logic above).
+   - **Change:** Pass `max_steps=<parsed_value>` to `Orchestrator(...)` constructor.
+   - **Change:** Update HTTP route handler from `@app.route("/query", methods=["POST"])` to `@app.route("/query_given", methods=["POST"])`.
+   - **Lines affected:** ~12–15 lines (env var parsing + logging + constructor call update + route path change).
+
+2. **`tests/test_http_server.py`** (or `tests/test_run_server.py` if separate; create if does not exist)
+   - **Change:** Add new test cases for `AGENT_MAX_STEPS` parsing (AC-6, see Test Plan below).
+   - **Change:** Add test case for HTTP endpoint path (new route `/query_given`, old route `/query` returns 404).
+   - **Lines affected:** ~80–100 lines (3 test cases: valid env var, invalid env var, endpoint path).
+
+### Files to read (context only)
+
+- **`app/agent/orchestrator.py`** (Story 1 added `max_steps` parameter; this story passes it from env var).
+- **`app/run_server.py`** (existing HTTP server setup, route registration, `Orchestrator` instantiation).
+
+---
+
+## Interfaces
+
+### run_server startup logic (modified)
+
+**Before:**
 
 ```python
+# Existing instantiation (Story 1)
 orchestrator = Orchestrator(
     llm_client=llm_client,
     mcp_client=mcp_client,
     tools=tools,
-    max_steps=max_steps  # <-- PASS PARSED VALUE FROM ENV VAR
+    max_steps=5  # hardcoded default
 )
+
+@app.route("/query", methods=["POST"])
+def query():
+    # handler logic
+    ...
+```
+
+**After:**
+
+```python
+import os
+import logging
+
+logger = logging.getLogger(__name__)
+
+# NEW: Parse AGENT_MAX_STEPS
+try:
+    raw = os.environ.get("AGENT_MAX_STEPS", "")
+    if raw:
+        max_steps = int(raw)
+        if max_steps <= 0:
+            raise ValueError("AGENT_MAX_STEPS must be positive")
+    else:
+        max_steps = 5  # default when env var is absent
+except (ValueError, TypeError):
+    logger.warning("Invalid AGENT_MAX_STEPS, using default 5")
+    max_steps = 5
+
+# Pass max_steps from env var
+orchestrator = Orchestrator(
+    llm_client=llm_client,
+    mcp_client=mcp_client,
+    tools=tools,
+    max_steps=max_steps  # from env var parsing
+)
+
+@app.route("/query_given", methods=["POST"])  # CHANGED PATH
+def query_given():  # CHANGED FUNCTION NAME
+    # handler logic (unchanged)
+    ...
 ```
 
 ---
 
 ## Algorithm notes
 
-### Parsing flow
+### Environment variable parsing logic
 
-1. Read `AGENT_MAX_STEPS` from `os.environ` (default to `""` if absent).
-2. If empty string → use default `5`, no warning (env var not set is normal).
-3. If non-empty:
-   - Parse as `int()`.
-   - If parse succeeds, check `> 0`. If not, raise `ValueError`.
-   - If parse fails or value `<= 0`, catch exception → log warning, use default `5`.
-4. Pass parsed `max_steps` to `Orchestrator(...)` constructor.
+**Step 1:** Read env var with `os.environ.get("AGENT_MAX_STEPS", "")` → returns string or `""`.
 
-### Edge cases
+**Step 2:** Check if string is non-empty:
+- Empty (`""`) → use default `5`, no warning (env var not set is normal).
+- Non-empty → attempt to parse as `int`.
 
-- **Env var absent (`""`):** Use default `5`, no warning.
-- **Env var = `"0"`:** Parse as `0`, fail `> 0` check → warning, default `5`.
-- **Env var = `"-1"`:** Parse as `-1`, fail `> 0` check → warning, default `5`.
-- **Env var = `"foo"`:** `int()` raises `ValueError` → warning, default `5`.
-- **Env var = `"3.5"`:** `int()` raises `ValueError` (cannot parse float string) → warning, default `5`.
-- **Env var = `"3"`:** Parse as `3`, pass `> 0` check → use `3`, no warning.
+**Step 3:** Parse as `int` inside `try/except`:
+- Success → validate `> 0`:
+  - `<= 0` → raise `ValueError` (caught by `except`).
+  - `> 0` → use parsed value.
+- Failure (`ValueError` or `TypeError`) → log warning, use default `5`.
 
-### Log message
+**Step 4:** Pass parsed or default `max_steps` to `Orchestrator` constructor.
 
-- **Warning message:** `"Invalid AGENT_MAX_STEPS, using default 5"`
-- **Log level:** `logger.warning(...)`
-- **Triggered when:** Any exception (`ValueError` or `TypeError`) during parsing/validation.
+**Edge cases:**
 
----
+- `AGENT_MAX_STEPS=""` (empty string) → use default `5`, no warning.
+- `AGENT_MAX_STEPS="3"` → use `max_steps=3`, no warning.
+- `AGENT_MAX_STEPS="0"` → log warning, use default `5`.
+- `AGENT_MAX_STEPS="-1"` → log warning, use default `5`.
+- `AGENT_MAX_STEPS="foo"` → log warning, use default `5`.
+- `AGENT_MAX_STEPS="3.5"` → log warning (float string fails `int()` parse), use default `5`.
 
-## Tests
+### HTTP route handler path change
 
-### Test structure
+**Before:** `@app.route("/query", methods=["POST"])`  
+**After:** `@app.route("/query_given", methods=["POST"])`
 
-All tests in `tests/test_http_server.py` (or `tests/test_run_server.py`).  
-Mock `os.environ` to control `AGENT_MAX_STEPS` value.  
-Mock `Orchestrator` constructor to capture `max_steps` argument.  
-Mock `logger.warning` to verify warning is logged (or not logged).
+**Function name change (optional but recommended for clarity):**  
+`def query():` → `def query_given():`
 
----
+**Handler logic:** Unchanged. The handler still calls `orchestrator.handle_query(query_text)` and returns the result with appropriate HTTP status codes (200, 400, 500).
 
-### Test 1: Valid AGENT_MAX_STEPS (AC-1)
-
-**Setup:**
-- Mock `os.environ.get("AGENT_MAX_STEPS")` to return `"3"`.
-- Mock `Orchestrator` constructor to capture arguments (e.g., using `unittest.mock.patch` with side_effect or return_value).
-- Mock `logger.warning` to capture calls.
-
-**Execute:**
-- Run the `run_server` startup logic (or call the env-parsing function/module directly if it's factored out).
-
-**Assert:**
-- `Orchestrator` constructor was called with `max_steps=3`.
-- `logger.warning` was not called.
-
-**Implementation:**
-
-```python
-@patch("app.run_server.logger.warning")
-@patch("app.run_server.Orchestrator")
-@patch.dict("os.environ", {"AGENT_MAX_STEPS": "3"})
-def test_valid_agent_max_steps(mock_orchestrator, mock_warning):
-    # Setup: mock dependencies
-    mock_llm_client = Mock()
-    mock_mcp_client = Mock()
-    mock_tools = [{"name": "test_tool"}]
-    
-    # Execute: run env var parsing and Orchestrator instantiation
-    # (assumes this logic is in a function like `create_orchestrator()` or in module-level code)
-    import app.run_server
-    # Trigger module reload or call the relevant function
-    
-    # Assert
-    mock_orchestrator.assert_called_once()
-    assert mock_orchestrator.call_args[1]["max_steps"] == 3
-    mock_warning.assert_not_called()
-```
+**Old route `/query`:** Does not exist after this story. Requests to `POST /query` return `404 Not Found`.
 
 ---
 
-### Test 2: Invalid AGENT_MAX_STEPS (AC-2)
+## Edge cases / failure modes
 
-**Setup:**
-- Mock `os.environ.get("AGENT_MAX_STEPS")` to return invalid values in separate sub-tests:
-  - `"foo"` (non-integer)
-  - `"-1"` (non-positive)
-  - `""` (empty string — **special case: no warning expected**, see below)
-  - `"3.5"` (decimal, not parseable as int)
-- Mock `Orchestrator` constructor to capture arguments.
-- Mock `logger.warning` to capture calls.
+### Edge case 1: AGENT_MAX_STEPS not set (env var absent)
 
-**Execute:**
-- Run the `run_server` startup logic for each invalid value.
+**Scenario:** `AGENT_MAX_STEPS` is not set in the environment (i.e., `os.environ.get("AGENT_MAX_STEPS", "")` returns `""`).
 
-**Assert for `"foo"`, `"-1"`, `"3.5"`:**
-- `Orchestrator` constructor was called with `max_steps=5` (default).
-- `logger.warning` was called once with message `"Invalid AGENT_MAX_STEPS, using default 5"`.
+**Behavior:** Use default `5`, no warning logged.
 
-**Assert for `""` (empty string, env var absent):**
-- `Orchestrator` constructor was called with `max_steps=5` (default).
-- `logger.warning` was **not** called (empty string is normal, not invalid).
-
-**Implementation:**
-
-```python
-@pytest.mark.parametrize("env_value,should_warn", [
-    ("foo", True),
-    ("-1", True),
-    ("3.5", True),
-    ("", False),  # empty string = absent, no warning
-])
-@patch("app.run_server.logger.warning")
-@patch("app.run_server.Orchestrator")
-def test_invalid_agent_max_steps(mock_orchestrator, mock_warning, env_value, should_warn):
-    # Setup: set env var
-    with patch.dict("os.environ", {"AGENT_MAX_STEPS": env_value} if env_value else {}, clear=True):
-        mock_llm_client = Mock()
-        mock_mcp_client = Mock()
-        mock_tools = [{"name": "test_tool"}]
-        
-        # Execute: run env var parsing and Orchestrator instantiation
-        import app.run_server
-        # Trigger module reload or call the relevant function
-        
-        # Assert
-        mock_orchestrator.assert_called_once()
-        assert mock_orchestrator.call_args[1]["max_steps"] == 5
-        
-        if should_warn:
-            mock_warning.assert_called_once_with("Invalid AGENT_MAX_STEPS, using default 5")
-        else:
-            mock_warning.assert_not_called()
-```
-
-**Corrected assertion summary:**
-
-| Value | `max_steps` | Warning logged? |
-|-------|-------------|-----------------|
-| `"3"` (valid) | `3` | No |
-| `"foo"` | `5` | Yes |
-| `"-1"` | `5` | Yes |
-| `"3.5"` | `5` | Yes |
-| `""` (absent) | `5` | **No** |
-
-**Total sub-cases:** 5 (1 valid + 4 invalid/absent scenarios).
-
-**Test count:** 2 test methods (Test 1 for valid, Test 2 with 4 sub-cases for invalid).
+**Test:** Variant of Test 1 where `os.environ` does not contain `AGENT_MAX_STEPS` → assert `max_steps=5`, no warning.
 
 ---
 
-## Implementation checklist
+### Edge case 2: AGENT_MAX_STEPS set to very large value
 
-- [ ] Add `import os` at top of `app/run_server.py` (if not already present).
-- [ ] Add `import logging` and `logger = logging.getLogger(__name__)` at top of `app/run_server.py` (if not already present).
-- [ ] Add env var parsing logic before `Orchestrator` instantiation (see algorithm above).
-- [ ] Update `Orchestrator(...)` constructor call to pass `max_steps=max_steps`.
-- [ ] Add Test 1 (valid `AGENT_MAX_STEPS = "3"`).
-- [ ] Add Test 2 with 4 sub-cases (invalid values `"foo"`, `"-1"`, `"3.5"`, and absent `""`).
-- [ ] Run `python -m pytest tests/test_http_server.py -q` (or `tests/test_run_server.py`) and confirm all tests pass.
+**Scenario:** `AGENT_MAX_STEPS="9999"` or `"1000000"`.
+
+**Behavior:** Parsed as `int`, validated as `> 0` → used as-is. No upper bound check (per requirements; deployment can set any positive int).
+
+**Test:** Not added (no upper bound requirement; valid behavior).
 
 ---
 
-## Notes
+### Edge case 3: AGENT_MAX_STEPS set to zero
 
-### Dependency on Story 01-agent
+**Scenario:** `AGENT_MAX_STEPS="0"`.
 
-This story depends on Story 01-agent having added the `max_steps: int = 5` parameter to `Orchestrator.__init__`. If Story 01-agent is not complete, this story's constructor call will fail (unexpected keyword argument).
+**Behavior:** Parsed as `int(0)`, fails `> 0` check → `ValueError` raised and caught → warning logged, default `5` used.
 
-### Empty string behavior
+**Test:** Sub-case of Test 2.
 
-**Clarification:** The breakdown says `""` is invalid and should trigger a warning. However, requirements.md FR-3 and HLD AD-3 state:
+---
 
-> "If the value is invalid (non-integer, non-positive, or **empty**) → log a warning and use default 5."
+### Edge case 4: Multiple instantiations (e.g., test fixtures)
 
-But also:
+**Scenario:** Test suite instantiates `Orchestrator` multiple times with different env var values.
 
-> "When env var is **absent** or invalid, use default 5."
+**Behavior:** Each instantiation parses `AGENT_MAX_STEPS` independently. No global state or caching (env var is read fresh each time).
 
-And the parsing logic in HLD AD-3 shows:
+**Test:** Not added (no cross-instantiation behavior; each parse is independent).
 
-```python
-if raw:
-    max_steps = int(raw)
-    ...
-else:
-    max_steps = 5  # default when env var is absent
-```
+---
 
-This branch (`else`) is reached when `raw == ""`, and **no exception is raised**, so **no warning is logged**. The breakdown's "Invalid values" list includes `""`, but the HLD's parsing logic treats `""` (absent) as a normal case, not an error.
+## Risks
 
-**Resolution:** Follow the HLD (the design of record). Empty string → default 5, no warning. Only **non-empty invalid** values trigger the warning. Update Test 2 assertion for `""` to expect **no warning**.
+### RISK-1: Typo in env var name breaks configuration
 
-### Test framework
+**Likelihood:** Low (env var name is documented in README in Story 4)  
+**Impact:** Medium (deployment uses default `5` instead of intended value)  
+**Mitigation (implemented):** Env var name is spelled consistently across code and docs: `AGENT_MAX_STEPS`. Story 4 documents it in README.  
+**Residual risk:** Operators must spell env var correctly. Accepted: standard risk for env var configuration.
 
-- Use `unittest.mock` (Python standard library) or `pytest-mock` (if pytest is the test framework).
-- Use `patch.dict("os.environ", ...)` to mock environment variables.
-- Use `patch("module.Orchestrator")` to mock the constructor and capture arguments.
-- Use `patch("module.logger.warning")` to mock logger calls and assert on warning message.
+---
+
+### RISK-2: Warning log message not seen in production
+
+**Likelihood:** Medium (operators may not monitor logs closely)  
+**Impact:** Low (default `5` is used, which is reasonable)  
+**Mitigation (implemented):** Warning logged at `logger.warning` level (typically visible in production logs). Invalid env var does not crash the server, just uses default.  
+**Residual risk:** Operators may not notice invalid config until they observe default behavior. Accepted: logging is the standard notification mechanism.
+
+---
+
+### RISK-3: Endpoint path change breaks existing clients
+
+**Likelihood:** High (if existing clients are hardcoded to `/query`)  
+**Impact:** High (all requests fail with 404)  
+**Mitigation (implemented):** README updated in Story 4 with new endpoint path `/query_given`. Test case verifies old route `/query` returns 404.  
+**Residual risk:** Clients must be updated to use `/query_given`. This is a **breaking change** per review_feedback.md; it is intentional. Clients that do not update will break.  
+**Acceptance:** This is a deliberate breaking change requested in review feedback. No backward-compatibility route is added.
+
+---
+
+## Dependencies
+
+- **Story 1:** `Orchestrator.__init__` accepts `max_steps` parameter (added in Story 1). This story passes it from env var parsing.
+- **Existing:** `llm_client`, `mcp_client`, `tools` are already instantiated before `Orchestrator` (unchanged).
+- **Existing:** Flask (or equivalent HTTP framework) app and route registration (unchanged except route path).
+- **Story 3 dependency:** Test expansion for loop behavior (Story 3 will add orchestrator-level tests; this story adds env var and endpoint tests only).
+- **Story 4 dependency:** README documentation (Story 4 will document `AGENT_MAX_STEPS` and `/query_given` endpoint).
+
+No new external dependencies.
+
+---
+
+## Implementation notes
+
+- **Env var parsing:** Use `os.environ.get("AGENT_MAX_STEPS", "")` to read env var. Empty string means "not set" → use default `5`, no warning. Non-empty invalid values → log warning, use default `5`.
+- **Validation logic:** `try/except (ValueError, TypeError)` catches both `int()` parse failures and comparison failures (`<= 0` raises `ValueError`).
+- **Logging:** Use `logger.warning("Invalid AGENT_MAX_STEPS, using default 5")` (no exception details in log message; the message is clear enough).
+- **Route path change:** Update `@app.route("/query", ...)` to `@app.route("/query_given", ...)`. Function name change (`def query():` → `def query_given():`) is optional but recommended for clarity. Handler logic (calling `orchestrator.handle_query`, returning JSON response, handling exceptions) is unchanged.
+- **Backward compatibility:** No backward-compatibility route for `/query`. The old endpoint no longer exists. This is a **breaking change**.
 
 ---
 
 ## Verification checklist
 
-- [ ] All unit tests in `tests/test_http_server.py` pass (Tests 1–2).
-- [ ] `python -m pytest tests/test_http_server.py -q` exits 0.
-- [ ] Manual review: `Orchestrator` constructor in `run_server.py` receives `max_steps` from env var.
-- [ ] Manual review: Invalid `AGENT_MAX_STEPS` logs warning with correct message.
-- [ ] Manual review: Absent or empty `AGENT_MAX_STEPS` does **not** log warning (uses default 5 silently).
+- [ ] All unit tests in `tests/test_http_server.py` pass (Tests 1–3).
+- [ ] `python -m pytest tests/test_http_server.py -q` exits 0 (all HTTP server tests pass).
+- [ ] Valid `AGENT_MAX_STEPS` (e.g., `"3"`) → `Orchestrator` instantiated with `max_steps=3`, no warning.
+- [ ] Invalid `AGENT_MAX_STEPS` (e.g., `"foo"`, `"-1"`, `"3.5"`) → `Orchestrator` instantiated with `max_steps=5`, warning logged.
+- [ ] Empty `AGENT_MAX_STEPS` (`""`) or absent → `Orchestrator` instantiated with `max_steps=5`, no warning.
+- [ ] HTTP `POST /query_given` succeeds (200 OK).
+- [ ] HTTP `POST /query` fails (404 Not Found).
+- [ ] Manual review: no changes to `orchestrator.py` or loop logic (this story only modifies `run_server.py` and adds tests).
+
+---
+
+## Out of scope for this story
+
+- **Orchestrator loop logic:** Story 1 implemented the loop; this story only passes `max_steps` from env var.
+- **Orchestrator unit tests:** Story 3 will expand `test_orchestrator.py` with loop behavior tests; this story adds only env var and endpoint tests in `test_http_server.py`.
+- **README documentation:** Story 4 will document `AGENT_MAX_STEPS` and `/query_given` endpoint; this story focuses on code changes only.
+- **Conversation memory across requests:** Out of scope for entire feature (per requirements.md).
+- **Streaming responses:** Out of scope for entire feature (per requirements.md).
+
+---
+
+## Tests
+
+### Test 1: Valid AGENT_MAX_STEPS (AC-6)
+
+**File:** `tests/test_http_server.py`
+
+**Test method:** `test_valid_agent_max_steps`
+
+**Mock setup:**
+- `os.environ = {"AGENT_MAX_STEPS": "3"}`
+- `Orchestrator` constructor mocked or spied (capture `max_steps` argument)
+- `logger.warning` mocked (verify not called)
+
+**Execution:**
+- Call startup logic (or function that parses env var and instantiates `Orchestrator`)
+
+**Assertions:**
+- `Orchestrator` called with `max_steps=3`
+- `logger.warning` not called
+
+---
+
+### Test 2: Invalid AGENT_MAX_STEPS (AC-6)
+
+**File:** `tests/test_http_server.py`
+
+**Test method:** `test_invalid_agent_max_steps` (parameterized with 4 sub-cases)
+
+**Sub-case 1: Non-integer string**
+- Mock `os.environ = {"AGENT_MAX_STEPS": "foo"}`
+- Assert: `Orchestrator` called with `max_steps=5`, `logger.warning` called once with message `"Invalid AGENT_MAX_STEPS, using default 5"`
+
+**Sub-case 2: Non-positive integer**
+- Mock `os.environ = {"AGENT_MAX_STEPS": "-1"}`
+- Assert: `Orchestrator` called with `max_steps=5`, `logger.warning` called once with message `"Invalid AGENT_MAX_STEPS, using default 5"`
+
+**Sub-case 3: Empty string (not set)**
+- Mock `os.environ = {"AGENT_MAX_STEPS": ""}` or `os.environ = {}` (no key)
+- Assert: `Orchestrator` called with `max_steps=5`, `logger.warning` **not** called
+
+**Sub-case 4: Float string**
+- Mock `os.environ = {"AGENT_MAX_STEPS": "3.5"}`
+- Assert: `Orchestrator` called with `max_steps=5`, `logger.warning` called once with message `"Invalid AGENT_MAX_STEPS, using default 5"`
+
+---
+
+### Test 3: HTTP endpoint path (new)
+
+**File:** `tests/test_http_server.py`
+
+**Test method:** `test_query_given_endpoint_path`
+
+**Mock setup:**
+- Start Flask test client (or equivalent HTTP test server)
+- Mock `Orchestrator.handle_query` to return `"Test answer"`
+
+**Execution (positive case):**
+- Send `POST /query_given` with JSON body `{"query": "test"}`
+
+**Assertions:**
+- Response status code is `200`
+- Response JSON is `{"answer": "Test answer"}`
+
+**Execution (negative case):**
+- Send `POST /query` with JSON body `{"query": "test"}`
+
+**Assertions:**
+- Response status code is `404` (route not found)
+
+---
+
+## Acceptance criteria (mapped to tests)
+
+- **AC-6 (AGENT_MAX_STEPS parsing):** Tests 1–2
+- **Endpoint path change (review_feedback.md):** Test 3
+
+Total: 3 unit tests in `tests/test_http_server.py`.
