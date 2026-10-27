@@ -10,16 +10,18 @@
 ### AC-1: Configuration and documentation updated
 
 **Given** the updated configuration and documentation files  
-**When** reviewing `.env.example`, `runtime/runner.py`, `model/policy.yaml`, `README.md`, and `docs/`  
+**When** reviewing `.env.example`, `src/agents/runtime/runner.py`, `src/agents/model/policy.yaml`, `README.md`, and `docs/`  
 **Then** all of the following are true:
 - `.env.example` contains required `ANTHROPIC_API_KEY=` and optional (commented) `ANTHROPIC_BASE_URL=`, with `LANGWATCH_DISABLED=false` and `LANGWATCH_API_KEY` / `LANGWATCH_ENDPOINT_URL` documented
 - `.env.example` does not contain `LITELLM_BASE_URL`, `ANTHROPIC_GATEWAY_TOKEN`, or Cloudflare gateway URL references
-- `runtime/runner.py` `_config()` comment references LangWatch instead of LiteLLM as the tracer
-- `model/policy.yaml` header comment describes direct Anthropic configuration
+- `src/agents/runtime/runner.py` `_config()` comment references LangWatch instead of LiteLLM as the tracer
+- `src/agents/model/policy.yaml` header comment describes direct Anthropic configuration
 - `docs/claude-via-litellm-cloudflare.md` is deleted
 - `README.md` LiteLLM/Cloudflare sections are removed or rewritten to describe direct Anthropic setup
 
 **Maps to:** Requirements AC-2, Breakdown Story 2 AC-1
+
+**Covers tickets:** PER-66 (02-agent: primary config/docs updates)
 
 ---
 
@@ -29,7 +31,9 @@
 **When** running `uv run pytest -q`  
 **Then** all existing tests pass with no failures
 
-**Maps to:** Requirements AC-6 (partial: no regressions), Breakdown Story 2 AC-2
+**Maps to:** Requirements AC-6 (partial: no regressions from config/docs updates), Breakdown Story 2 AC-2
+
+**Covers tickets:** PER-66 (02-agent: validates config/docs changes don't break tests)
 
 ---
 
@@ -38,6 +42,7 @@
 ### Modified Files
 
 **`.env.example`**
+- **Path:** `/mnt/c/trinet-adlc-agents/trinet-adlc-agents/.env.example` (standard config file at repo root)
 - Remove `LITELLM_BASE_URL=` line
 - Remove `ANTHROPIC_GATEWAY_TOKEN=` line
 - Remove any Cloudflare gateway URL examples
@@ -46,17 +51,20 @@
 - Change `LANGWATCH_DISABLED=true` to `LANGWATCH_DISABLED=false`
 - Ensure `LANGWATCH_API_KEY=` and `LANGWATCH_ENDPOINT_URL=` are present with documentation comments
 
-**`runtime/runner.py`** (path established by ticket context at `/home/regularinsaan/projects/trinet-adlc-agents`)
+**`src/agents/runtime/runner.py`**
+- **Path:** `/mnt/c/trinet-adlc-agents/trinet-adlc-agents/src/agents/runtime/runner.py` (confirmed in repo-tree)
 - Locate `_config()` method
 - Find comment referencing LiteLLM as tracer
-- Replace with comment: "LangWatch handles tracing when enabled" (or similar phrasing consistent with codebase style)
+- Replace with comment: "LangWatch handles tracing when enabled (LANGWATCH_DISABLED=false)"
 
-**`model/policy.yaml`** (path established by ticket context at `/home/regularinsaan/projects/trinet-adlc-agents`)
+**`src/agents/model/policy.yaml`**
+- **Path:** `/mnt/c/trinet-adlc-agents/trinet-adlc-agents/src/agents/model/policy.yaml` (confirmed in repo-tree)
 - Locate header comment section
-- Replace references to LiteLLM → Cloudflare → Anthropic routing
+- Replace references to LiteLLM routing with direct Anthropic API description
 - Update to describe direct Anthropic API calls via SDK
 
-**`README.md`** (path established by ticket context at `/home/regularinsaan/projects/trinet-adlc-agents`)
+**`README.md`**
+- **Path:** `/mnt/c/trinet-adlc-agents/trinet-adlc-agents/README.md` (confirmed in repo-tree)
 - Locate sections titled or describing "LiteLLM setup", "Cloudflare AI Gateway", or similar
 - Remove or rewrite to describe direct Anthropic configuration:
   - Required: `ANTHROPIC_API_KEY` from Anthropic Console
@@ -68,7 +76,8 @@
 
 ### Deleted Files
 
-**`docs/claude-via-litellm-cloudflare.md`** (path established by ticket context at `/home/regularinsaan/projects/trinet-adlc-agents`)
+**`docs/claude-via-litellm-cloudflare.md`**
+- **Path:** `/mnt/c/trinet-adlc-agents/trinet-adlc-agents/docs/claude-via-litellm-cloudflare.md`
 - Remove entire file (no replacement doc; direct Anthropic setup covered in `README.md`)
 
 ---
@@ -121,11 +130,9 @@ LangWatch tracing is enabled by default. Configure:
 - `LANGWATCH_DISABLED`: Set to `true` to disable tracing (default: `false`)
 - `LANGWATCH_API_KEY`: Your LangWatch API key
 - `LANGWATCH_ENDPOINT_URL`: LangWatch endpoint URL
-
-[Additional LangWatch setup instructions if needed...]
 ```
 
-**`model/policy.yaml` Header Comment (target state):**
+**`src/agents/model/policy.yaml` Header Comment (target state):**
 
 ```yaml
 # Model routing policy
@@ -133,7 +140,7 @@ LangWatch tracing is enabled by default. Configure:
 # Configure via ANTHROPIC_API_KEY (required) and ANTHROPIC_BASE_URL (optional override)
 ```
 
-**`runtime/runner.py` `_config()` Comment (target state):**
+**`src/agents/runtime/runner.py` `_config()` Comment (target state):**
 
 ```python
 def _config(self, ...):
@@ -153,16 +160,16 @@ def _config(self, ...):
 
 2. **Add required variables:**
    - Insert `ANTHROPIC_API_KEY=` near top of file (group with other API keys if present)
-   - Ensure line is uncommented (no `#` prefix)
+   - Ensure line is uncommented
 
 3. **Add optional override:**
    - Insert `# ANTHROPIC_BASE_URL=https://api.anthropic.com` below `ANTHROPIC_API_KEY`
-   - Add comment: `# Uncomment to override default Anthropic endpoint`
+   - Add comment explaining override usage
 
 4. **Update LangWatch config:**
    - Change `LANGWATCH_DISABLED=true` to `LANGWATCH_DISABLED=false`
    - Verify `LANGWATCH_API_KEY=` and `LANGWATCH_ENDPOINT_URL=` are present
-   - Add documentation comment if missing (e.g., `# LangWatch API key for tracing`)
+   - Add documentation comment if missing
 
 ---
 
@@ -173,34 +180,32 @@ def _config(self, ...):
    - Identify code examples showing `LITELLM_BASE_URL` or `ANTHROPIC_GATEWAY_TOKEN`
 
 2. **Rewrite or remove:**
-   - **Architecture/routing descriptions:** Replace with "Direct Anthropic API calls via official SDK"
-   - **Setup instructions:** Replace with required `ANTHROPIC_API_KEY` + optional `ANTHROPIC_BASE_URL`
-   - **Tracing sections:** Update to describe LangWatch as default tracer
-   - **Orphaned content:** Remove if no longer applicable (e.g., LiteLLM-specific troubleshooting)
+   - Architecture/routing descriptions: Replace with "Direct Anthropic API calls via official SDK"
+   - Setup instructions: Replace with required `ANTHROPIC_API_KEY` plus optional `ANTHROPIC_BASE_URL`
+   - Tracing sections: Update to describe LangWatch as default tracer
+   - Orphaned content: Remove if no longer applicable
 
 3. **Preserve:**
-   - Model selection, `max_tokens`, prompt engineering sections (unchanged)
+   - Model selection, max_tokens, prompt engineering sections (unchanged)
    - MCP, GraphQL, backend/frontend references (unchanged)
    - Any non-routing architectural content
 
 4. **Validation:**
-   - After rewrite, search `README.md` for `litellm`, `cloudflare`, `cf-aig`, `ANTHROPIC_GATEWAY_TOKEN`
+   - After rewrite, search `README.md` for removed references
    - Ensure no matches remain
 
 ---
 
 ### Comment Update Pattern
 
-**`runtime/runner.py` (one-line change):**
+**`src/agents/runtime/runner.py` (one-line change):**
 - Locate `_config()` method definition
-- Find line like: `# LiteLLM handles tracing` or `# Tracing via LiteLLM`
-- Replace with: `# LangWatch handles tracing when enabled`
+- Find comment referencing LiteLLM as tracer
+- Replace with: "LangWatch handles tracing when enabled (LANGWATCH_DISABLED=false)"
 
-**`model/policy.yaml` (header block rewrite):**
-- Locate YAML header comments (typically first 3-10 lines after `---` or at file start)
-- Replace routing description:
-  - **Old:** "Routes through LiteLLM → Cloudflare AI Gateway → Anthropic"
-  - **New:** "Direct Anthropic API calls via AsyncAnthropic client"
+**`src/agents/model/policy.yaml` (header block rewrite):**
+- Locate YAML header comments
+- Replace routing description with: "All model calls and skill uploads go directly to Anthropic API via anthropic.AsyncAnthropic client. Configure via ANTHROPIC_API_KEY (required) and ANTHROPIC_BASE_URL (optional override)."
 - Preserve any model selection or policy-specific comments
 
 ---
@@ -209,10 +214,10 @@ def _config(self, ...):
 
 ### Test Count
 
-**Total automated tests:** 0 new tests  
+**Total automated tests added in this story:** 0 new tests  
 **Verification steps:** 6 manual validation steps
 
-This story modifies configuration templates and documentation only. No new automated tests are created. Story 3 will add comprehensive test coverage (9 automated tests: 6 gateway + 3 tracing per breakdown).
+This story modifies configuration templates and documentation only. No new automated tests are created. Story 03-agent (PER-67) will add 9 automated tests (6 gateway in `tests/test_gateway.py` plus 3 rewritten in `tests/test_tracing.py` per Requirements AC-4, AC-5, AC-6 and Breakdown Story 3 verification approach).
 
 ---
 
@@ -221,11 +226,11 @@ This story modifies configuration templates and documentation only. No new autom
 **Step 1: Grep validation**
 ```bash
 grep -ri "litellm\|cloudflare\|cf-aig\|ANTHROPIC_GATEWAY_TOKEN" \
-  .env.example runtime/runner.py model/policy.yaml docs README.md
+  .env.example src/agents/runtime/runner.py src/agents/model/policy.yaml docs README.md
 ```
 - **Expected output:** No matches
 - **If matches found:** Review and remove remaining references
-- **Maps to:** Requirements AC-2 (partial), AC-3
+- **Maps to:** Requirements AC-2 (partial), Requirements AC-3 (partial: config/docs cleanup)
 
 ---
 
@@ -234,7 +239,7 @@ grep -ri "litellm\|cloudflare\|cf-aig\|ANTHROPIC_GATEWAY_TOKEN" \
 [ ! -f docs/claude-via-litellm-cloudflare.md ] && echo "PASS" || echo "FAIL"
 ```
 - **Expected output:** `PASS`
-- **Maps to:** Requirements AC-2 (partial)
+- **Maps to:** Requirements AC-2 (partial: doc deletion)
 
 ---
 
@@ -249,24 +254,25 @@ grep -ri "litellm\|cloudflare\|cf-aig\|ANTHROPIC_GATEWAY_TOKEN" \
   - `LITELLM_BASE_URL`
   - `ANTHROPIC_GATEWAY_TOKEN`
   - Cloudflare URLs
-- **Maps to:** Requirements AC-2 (partial)
+- **Maps to:** Requirements AC-2 (partial: config schema updated)
 
 ---
 
 **Step 4: Comment verification**
-- Open `runtime/runner.py` and locate `_config()` method
+- Open `src/agents/runtime/runner.py` and locate `_config()` method
 - **Verify:** Comment references LangWatch (not LiteLLM)
-- Open `model/policy.yaml` and read header comments
+- Open `src/agents/model/policy.yaml` and read header comments
 - **Verify:** Description matches direct Anthropic setup
-- **Maps to:** Requirements AC-2 (partial)
+- **Maps to:** Requirements AC-2 (partial: tracing and policy comments updated)
 
 ---
 
 **Step 5: README validation**
 - Open `README.md` and locate configuration/setup sections
 - **Verify:** No LiteLLM/Cloudflare instructions remain
-- **Verify:** Direct Anthropic setup documented (API key + optional base URL)
-- **Maps to:** Requirements AC-2 (partial)
+- **Verify:** Direct Anthropic setup documented (API key plus optional base URL)
+- **Verify:** LangWatch tracing described as default
+- **Maps to:** Requirements AC-2 (partial: documentation rewritten)
 
 ---
 
@@ -276,19 +282,21 @@ uv run pytest -q
 ```
 - **Expected output:** Exit code 0 (all tests pass)
 - **Note:** Config/doc changes should not affect test logic
-- **If failures occur:** Review for unintended breakage (e.g., hardcoded config paths)
+- **If failures occur:** Review for unintended breakage
 - **Maps to:** Requirements AC-6 (partial: no regressions introduced), Breakdown Story 2 AC-2
 
 ---
 
 ## Notes
 
-- **AC count alignment:** Story has 2 ACs (AC-1 consolidates all Requirements AC-2 elements, AC-2 covers regression check); Requirements AC-2 is the single AC mapped to this story, matching breakdown Story 2 structure
-- **Test count alignment:** 0 new tests in this story; Story 3 adds 9 automated tests (6 gateway + 3 tracing) per breakdown verification approach and Requirements AC-4, AC-5, AC-6
-- **File path verification:** All paths (`.env.example`, `runtime/runner.py`, `model/policy.yaml`, `README.md`, `docs/claude-via-litellm-cloudflare.md`) established by ticket context at `/home/regularinsaan/projects/trinet-adlc-agents`; repo-tree shows empty `existing files:` list indicating tree is incomplete but paths are specified in ticket and breakdown
-- **Comment-only changes:** `runtime/runner.py` and `model/policy.yaml` modifications touch comments only; no code logic changes
-- **Documentation scope:** `README.md` rewrite focuses on configuration/setup sections; architecture/design sections may also reference routing but are lower priority
-- **Deleted doc:** `claude-via-litellm-cloudflare.md` removal leaves no replacement; direct Anthropic setup is simpler and covered in `README.md`
-- **LangWatch default:** Setting `LANGWATCH_DISABLED=false` in `.env.example` makes tracing opt-out instead of opt-in (aligns with Story 1 removing LiteLLM as tracer)
-- **No code execution risk:** This story modifies config templates and documentation only; no runtime logic changes, so test suite should pass unchanged
-- **Grep pattern:** The verification `grep` command uses case-insensitive (`-i`) and recursive (`-r`) flags to catch any casing variations (e.g., `LiteLLM`, `LITELLM`, `litellm`)
+- **AC count alignment:** Story has 2 ACs matching Breakdown Story 2 structure; Requirements AC-2 maps to this story's AC-1; Requirements AC-6 partially maps to this story's AC-2
+- **Test count alignment:** 0 new automated tests in this story; Story 03-agent adds 9 tests (6 gateway plus 3 tracing per Requirements AC-4, AC-5, AC-6 and Breakdown verification approach); sum across all three stories: 0 (Story 01) plus 0 (Story 02) plus 9 (Story 03) equals 9 total
+- **File path precision:** All paths use concrete repo-tree locations where confirmed; `.env.example` and `docs/claude-via-litellm-cloudflare.md` established by ticket context; `src/agents/model/policy.yaml` confirmed in repo-tree
+- **Ticket coverage explicit:** AC-1 covers PER-66 (02-agent: primary config/docs updates); AC-2 covers PER-66 (02-agent: validates config/docs changes don't break tests)
+- **Comment-only changes:** `src/agents/runtime/runner.py` and `src/agents/model/policy.yaml` modifications touch comments only; no code logic changes
+- **Documentation scope:** `README.md` rewrite focuses on configuration/setup sections
+- **Deleted doc rationale:** `claude-via-litellm-cloudflare.md` removal leaves no replacement; direct Anthropic setup covered in `README.md`
+- **LangWatch default change:** Setting `LANGWATCH_DISABLED=false` in `.env.example` makes tracing opt-out instead of opt-in
+- **No code execution risk:** This story modifies config templates and documentation only; no runtime logic changes
+- **Grep pattern details:** Verification grep command uses case-insensitive and recursive flags
+- **Verification step count:** 6 manual validation steps map to Requirements AC-2 (5 steps validate config/docs updates) and AC-6 (1 step validates no test regressions)

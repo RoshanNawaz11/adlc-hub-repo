@@ -1,0 +1,1 @@
+One spec file (specs/01.md) covers all three stories; do not require specs/02.md or specs/03.md. In proposed_tickets.md list every AC each ticket covers. The repo is now available; re-read the real files (src/agents/model/gateway.py, skills/client.py, runtime/runner.py, tests/test_tracing.py) and fix any details that don't match.

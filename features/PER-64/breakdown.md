@@ -37,14 +37,14 @@ Replace LiteLLM and Cloudflare client paths with a single `anthropic.AsyncAnthro
 2. Existing tests pass (`uv run pytest -q`)
 
 **Allowed Paths:**  
-- `src/agents/model/gateway.py` (modified; path established by ticket context at `/home/regularinsaan/projects/trinet-adlc-agents`)
+- `src/agents/model/gateway.py` (modified; file exists per repo-tree)
 
 **After:** None (opening story)
 
 **Verification Approach:**  
 Manual REPL testing: verify same client instance returned, default and custom base URL behavior, `MissingAPIKeyError` raised when key unset. Code review: confirm no LiteLLM/Cloudflare references in `src/agents/model/gateway.py`, session tracking preserved. Run existing test suite to confirm no regressions.
 
-**Test count:** 0 new automated tests (existing tests must pass; Story 3 adds 6 gateway tests + 3 tracing tests = 9 total per Requirements AC-4, AC-5, AC-6)
+**Test count:** 0 new automated tests (existing tests must pass; Story 3 adds 9 automated tests per Requirements AC-4, AC-5, AC-6)
 
 **HITL:** False
 
@@ -55,26 +55,26 @@ Manual REPL testing: verify same client instance returned, default and custom ba
 **Repo:** `agent`
 
 **Description:**  
-Remove `LITELLM_BASE_URL`, `ANTHROPIC_GATEWAY_TOKEN`, and Cloudflare URL references from `.env.example`; add required `ANTHROPIC_API_KEY=` and optional (commented) `ANTHROPIC_BASE_URL=`. Set `LANGWATCH_DISABLED=false` and document `LANGWATCH_API_KEY` / `LANGWATCH_ENDPOINT_URL`. Update the `runtime/runner.py` `_config()` comment to reference LangWatch instead of LiteLLM. Update `model/policy.yaml` header comment to reflect direct Anthropic configuration. Delete `docs/claude-via-litellm-cloudflare.md`. Rewrite or remove LiteLLM/Cloudflare sections in `README.md` to describe the direct Anthropic setup.
+Remove `LITELLM_BASE_URL`, `ANTHROPIC_GATEWAY_TOKEN`, and Cloudflare URL references from `.env.example`; add required `ANTHROPIC_API_KEY=` and optional (commented) `ANTHROPIC_BASE_URL=`. Set `LANGWATCH_DISABLED=false` and document `LANGWATCH_API_KEY` / `LANGWATCH_ENDPOINT_URL`. Update the `src/agents/runtime/runner.py` `_config()` comment to reference LangWatch instead of LiteLLM. Update `src/agents/model/policy.yaml` header comment to reflect direct Anthropic configuration. Delete `docs/claude-via-litellm-cloudflare.md`. Rewrite or remove LiteLLM/Cloudflare sections in `README.md` to describe the direct Anthropic setup.
 
 **Requirements Coverage:**  
 - From Requirements AC-2: Configuration and documentation updated
 
 **Acceptance Criteria:**  
-1. Configuration and documentation updated (per Requirements AC-2): `.env.example` contains required `ANTHROPIC_API_KEY=` and optional `ANTHROPIC_BASE_URL=` with LangWatch config, removes LiteLLM/Cloudflare references; `runtime/runner.py` comment references LangWatch; `model/policy.yaml` header describes direct Anthropic setup; `docs/claude-via-litellm-cloudflare.md` deleted; `README.md` LiteLLM/Cloudflare sections removed or rewritten
+1. Configuration and documentation updated (per Requirements AC-2): `.env.example` contains required `ANTHROPIC_API_KEY=` and optional `ANTHROPIC_BASE_URL=` with LangWatch config, removes LiteLLM/Cloudflare references; `src/agents/runtime/runner.py` comment references LangWatch; `src/agents/model/policy.yaml` header describes direct Anthropic setup; `docs/claude-via-litellm-cloudflare.md` deleted; `README.md` LiteLLM/Cloudflare sections removed or rewritten
 2. Existing tests pass (`uv run pytest -q`)
 
 **Allowed Paths:**  
-- `.env.example` (modified)
-- `runtime/runner.py` (modified: comment only)
-- `model/policy.yaml` (modified: comment only)
-- `docs/claude-via-litellm-cloudflare.md` (deleted)
-- `README.md` (modified)
+- `.env.example` (modified; standard config file at repo root)
+- `src/agents/runtime/runner.py` (modified: comment only; file exists per repo-tree)
+- `src/agents/model/policy.yaml` (modified: comment only; file exists per repo-tree)
+- `docs/claude-via-litellm-cloudflare.md` (deleted; path inferred from ticket context)
+- `README.md` (modified; file exists per repo-tree)
 
 **After:** Story 1 (requires `src/agents/model/gateway.py` refactor complete)
 
 **Verification Approach:**  
-Manual review of all listed files to confirm LiteLLM/Cloudflare references removed and new config documented. Run `grep -ri "litellm\|cloudflare\|cf-aig\|ANTHROPIC_GATEWAY_TOKEN" .env.example runtime/runner.py model/policy.yaml docs README.md` to verify no matches. Run existing test suite to confirm no regressions.
+Manual review of all listed files to confirm LiteLLM/Cloudflare references removed and new config documented. Run `grep -ri "litellm\|cloudflare\|cf-aig\|ANTHROPIC_GATEWAY_TOKEN" .env.example src/agents/runtime/runner.py src/agents/model/policy.yaml docs README.md` to verify no matches. Run existing test suite to confirm no regressions.
 
 **Test count:** 0 new automated tests (existing tests must pass; Story 3 adds 9 automated tests per Requirements AC-4, AC-5, AC-6)
 
@@ -87,7 +87,7 @@ Manual review of all listed files to confirm LiteLLM/Cloudflare references remov
 **Repo:** `agent`
 
 **Description:**  
-Create `tests/test_gateway.py` with six test cases validating `MissingAPIKeyError` when `ANTHROPIC_API_KEY` unset (two tests: one for `require_client()`, one for `require_skills_client()`), default Anthropic base URL behavior, custom `ANTHROPIC_BASE_URL` behavior, no custom auth headers, and singleton client instance. Rewrite `tests/test_tracing.py` to remove header assertions (`x-litellm-session-id`) and validate `traceparent()` stability per session ID, `traceparent()` variance across session IDs, and worker session context propagation. Document manual check in PR description: with real `ANTHROPIC_API_KEY` and no LiteLLM running, validate `run_so.py` completes one service order and a skill upload via `skills/client.py` succeeds.
+Create `tests/test_gateway.py` with six test cases validating `MissingAPIKeyError` when `ANTHROPIC_API_KEY` unset (two tests: one for `require_client()`, one for `require_skills_client()`), default Anthropic base URL behavior, custom `ANTHROPIC_BASE_URL` behavior, no custom auth headers, and singleton client instance. Rewrite `tests/test_tracing.py` to remove header assertions (`x-litellm-session-id`, `cf-aig-authorization`) and validate `traceparent()` stability per session ID, `traceparent()` variance across session IDs, and worker session context propagation. Document manual check in PR description: with real `ANTHROPIC_API_KEY` and no LiteLLM running, validate `run_so.py` completes one service order and a skill upload via `src/agents/skills/client.py` succeeds.
 
 **Requirements Coverage:**  
 - From Requirements AC-3: No LiteLLM or Cloudflare references remain in codebase
@@ -101,11 +101,11 @@ Create `tests/test_gateway.py` with six test cases validating `MissingAPIKeyErro
 2. Tracing tests rewritten to verify session-based behavior (per Requirements AC-5): `tests/test_tracing.py` rewritten with 3 test cases covering `traceparent()` stability per session ID, variance across session IDs, worker context propagation; no header assertions for `x-litellm-session-id` or `cf-aig-authorization` remain
 3. All automated tests pass (per Requirements AC-6): `uv run pytest -q` passes with 9 new tests (6 gateway + 3 tracing)
 4. No LiteLLM or Cloudflare references remain (per Requirements AC-3): `grep -ri "litellm\|cloudflare\|cf-aig\|ANTHROPIC_GATEWAY_TOKEN" src tests docs README.md .env.example` returns no matches
-5. Manual validation of direct Anthropic integration (per Requirements AC-7): PR description documents manual check with real `ANTHROPIC_API_KEY` and no LiteLLM running — `run_so.py` completes one service order and skill upload via `skills/client.py` succeeds
+5. Manual validation of direct Anthropic integration (per Requirements AC-7): PR description documents manual check with real `ANTHROPIC_API_KEY` and no LiteLLM running — `run_so.py` completes one service order and skill upload via `src/agents/skills/client.py` succeeds
 
 **Allowed Paths:**  
-- `tests/test_gateway.py` (new; path established by ticket context at `/home/regularinsaan/projects/trinet-adlc-agents`)
-- `tests/test_tracing.py` (modified; path established by ticket context)
+- `tests/test_gateway.py` (new; tests folder exists per repo-tree)
+- `tests/test_tracing.py` (modified; path inferred from ticket context, tests folder exists per repo-tree)
 
 **After:** Story 2 (requires config and docs updated)
 
@@ -121,18 +121,19 @@ Run `uv run pytest -q tests/test_gateway.py` to validate 6 new gateway tests pas
 ## Test Strategy
 
 ### Unit Tests
-- **Story 1:** Existing tests must pass; no new tests added
+- **Story 1:** Existing tests must pass; no new tests added (0 new tests)
+- **Story 2:** Existing tests must pass; no new tests added (0 new tests)
 - **Story 3:** 6 new tests in `tests/test_gateway.py` validate client instantiation, error handling, base URL behavior, header absence, and singleton pattern (Requirements AC-4)
 - **Story 3:** 3 rewritten tests in `tests/test_tracing.py` validate session tracking behavior (Requirements AC-5)
 
 ### Integration Tests
-- **Story 3 (manual):** Manual validation with real `ANTHROPIC_API_KEY` — `run_so.py` completes one service order and a skill upload via `skills/client.py` succeeds (documented in PR description per Requirements AC-7)
+- **Story 3 (manual):** Manual validation with real `ANTHROPIC_API_KEY` — `run_so.py` completes one service order and a skill upload via `src/agents/skills/client.py` succeeds (documented in PR description per Requirements AC-7)
 
 ### Regression Prevention
 - Each story runs `uv run pytest -q` to confirm no existing test failures
 - Story 3 runs `grep -ri "litellm\|cloudflare\|cf-aig\|ANTHROPIC_GATEWAY_TOKEN"` to validate complete removal (Requirements AC-3)
 
-**Total test count:** 9 automated tests (6 gateway + 3 tracing; aligns with Requirements AC-4, AC-5, AC-6)
+**Total test count:** 9 automated tests across all stories (Story 1: 0 new, Story 2: 0 new, Story 3: 9 new = 6 gateway + 3 tracing; sum: 0+0+9=9; aligns with Requirements AC-4, AC-5, AC-6)
 
 ---
 
@@ -155,10 +156,11 @@ None (all requirements and implementation details specified in ticket and HLD)
 ## Notes
 
 - **AC count alignment:** 7 Requirements ACs map to 2 ACs in Story 1, 2 ACs in Story 2, 5 ACs in Story 3 (total 9 story ACs covering all 7 Requirements ACs without fragmentation beyond ticket scope)
-- **Test count alignment:** 9 automated tests (6 gateway + 3 tracing) per Requirements AC-4, AC-5, AC-6; Story 3 verification approach and test count match
-- **File paths verified:** All paths (`src/agents/model/gateway.py`, `runtime/runner.py`, `model/policy.yaml`, `tests/test_gateway.py`, `tests/test_tracing.py`, `.env.example`, `README.md`, `docs/claude-via-litellm-cloudflare.md`) referenced in ticket context; repo-tree shows empty `existing files:` list indicating tree is incomplete but paths are established by ticket at `/home/regularinsaan/projects/trinet-adlc-agents`
+- **Test count alignment:** 9 automated tests (6 gateway + 3 tracing) per Requirements AC-4, AC-5, AC-6; Story 1 adds 0 tests, Story 2 adds 0 tests, Story 3 adds 9 tests (0+0+9=9); breakdown test strategy and story verification approaches match
+- **File paths verified:** Concrete paths confirmed in repo-tree: `src/agents/model/gateway.py`, `src/agents/runtime/runner.py`, `src/agents/model/policy.yaml`, `README.md` exist at `/mnt/c/trinet-adlc-agents/trinet-adlc-agents`; `.env.example` standard config file at repo root; `docs/claude-via-litellm-cloudflare.md` path inferred from ticket context; `tests/test_gateway.py` new file, `tests/test_tracing.py` path inferred (tests folder exists per repo-tree)
 - **No structural changes:** All work modifies existing modules or adds tests; no new architectural components
-- **Backward compatibility:** `require_skills_client()` method name preserved; callers unchanged
+- **Backward compatibility:** `require_skills_client()` method name preserved; callers (`src/agents/skills/client.py`, `src/agents/tools/bindings.py` per repo-tree) unchanged
 - **Session tracking continuity:** `session_id` ContextVar behavior unchanged; only label renamed for clarity
 - **Story sequencing:** Stories 1, 2, and 3 must execute in order; each produces a working system but full acceptance criteria validated only after Story 3
 - **Out of scope:** Model selection, `max_tokens`, prompts, MCP server, GraphQL, backend, frontend, and LangWatch tracer replacement explicitly excluded per ticket
+- **Real file context:** Repo-tree confirms `src/agents/model/gateway.py` exists (gateway refactor target), `src/agents/runtime/runner.py` exists (tracing comment update), `src/agents/skills/client.py` exists (skill upload validation), tests folder exists (new test files); `src/agents/model/policy.yaml` confirmed in repo-tree (not `model/policy.yaml` at root); `.env.example` and `tests/test_tracing.py` paths not shown in repo-tree but established by ticket context

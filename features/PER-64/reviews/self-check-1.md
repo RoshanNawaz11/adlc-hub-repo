@@ -1,23 +1,48 @@
 FAIL
 
-- **AC count mismatch (Requirements vs Breakdown)**: Requirements lists 5 ACs (AC-1 through AC-5). Breakdown Story 1 lists 9 ACs, Story 2 lists 7 ACs, Story 3 lists 6 ACs — total 22 story-level ACs. The breakdown text claims Stories 1-2 add no new tests and Story 3 adds 8 tests, but Story 3 AC-1 lists 6 gateway test cases (not 5) and AC-2 lists 3 tracing test cases, yielding 9 total automated tests. The breakdown "Test Strategy" section says "Total test count: 8 automated tests (matches Story 3 verification approach)" but Story 3 LLD counts 9 tests (6 gateway + 3 tracing). **Fix**: Align test counts — either breakdown says 9 or Story 3 LLD says 8; breakdown AC structure must match story AC structure (currently 5 requirements ACs do not map 1:1 to 22 story ACs).
+**Inconsistencies found:**
 
-- **Test count mismatch (Breakdown vs Story 3 LLD)**: Breakdown says "Total test count: 8 automated tests (matches Story 3 verification approach)" and "Story 3: 5 new tests in `tests/test_gateway.py`" + "3 rewritten tests in `tests/test_tracing.py`" = 8 tests. Story 3 LLD AC-1 lists **6 test cases** in `test_gateway.py` (cases 1-6), not 5. Story 3 LLD "Test Count" section says "Total automated tests: 9 tests" and "Mapping to breakdown: Story 3 verification approach specified 8 tests (5 gateway + 3 tracing); AC-1 lists 6 gateway test cases, yielding 9 total (6 gateway + 3 tracing)". This is a direct contradiction. **Fix**: Either breakdown updates to 9 tests (6+3) or Story 3 LLD removes one gateway test case to match breakdown's 8 (5+3).
+1. **Spec file coverage mismatch:**
+   - `proposed_tickets.md` shows three tickets (01, 02, 03)
+   - `specs/` contains only `specs/01.md` (covers all three stories per `change_requests.md`)
+   - **Missing:** `specs/02.md` and `specs/03.md` are absent, but `proposed_tickets.md` claims ticket 02 and 03 exist
+   - **Expected:** Either three separate spec files (one per ticket) OR `proposed_tickets.md` should consolidate all work under a single ticket ID if `change_requests.md` mandates one spec
 
-- **File path mismatch (Stories vs repo-tree)**: Story 1 LLD "File Plan" lists `src/agents/model/gateway.py`, Story 2 LLD lists `runtime/runner.py` and `model/policy.yaml`, Story 3 LLD lists `tests/test_gateway.py` and `tests/test_tracing.py`. The repo-tree for `agent` shows `root: /home/regularinsaan/projects/trinet-adlc-agents` with `existing files:` (empty list). The ticket context says "All model traffic in trinet_agents goes agents → LiteLLM" and references `src/agents/model/gateway.py`, implying a Python repo structure. However, the repo-tree shows no files — either the tree is incomplete or the paths in all LLDs are invented. **Fix**: If the repo-tree is incomplete, state that explicitly in the consistency check output; if paths are invented, FAIL on "file paths do not match repo context" (ADLC rule 4).
+2. **Ticket AC coverage mismatch in `proposed_tickets.md`:**
+   - `change_requests.md` requires: "In proposed_tickets.md list every AC each ticket covers"
+   - `proposed_tickets.md` lists partial ACs for tickets 01-03 but does **not** enumerate which specific Requirements ACs each ticket covers beyond high-level groupings
+   - **Example:** Ticket 01 shows "Requirements AC-1 (Gateway client refactored...), Requirements AC-6 (partial...)" but does not list AC-2, AC-3, AC-4, AC-5, AC-7 which the ticket partially covers (per story LLDs)
+   - **Expected:** Each ticket entry must list **all** Requirements ACs it touches (primary or partial), matching the "Covers tickets" fields in story LLD ACs
 
-- **Stack mismatch (Spec vs repo-context)**: Spec 01 says "Python 3.11+" and "uv" and "pytest". The project-context says "Single product repo: `app` (Python)" but repo-tree for `agent` shows no files. The ticket says "trinet_agents" (repo name), but proposed_tickets.md and tickets.md say "repo: agent". If the actual repo is named `trinet_agents` but child tickets use `agent`, that's a naming inconsistency. If the repo-tree is showing `agent` but is empty, the stack inference in Spec 01 (Python 3.11+, uv, pytest) is unverifiable against the tree. **Fix**: Clarify repo name consistency (ticket says `trinet_agents`, breakdown/tickets say `agent`) and verify stack against actual tree or mark tree as incomplete.
+3. **Real file scan contradictions (per `change_requests.md`):**
+   - `change_requests.md` requires: "re-read the real files (src/agents/model/gateway.py, skills/client.py, runtime/runner.py, tests/test_tracing.py) and fix any details that don't match"
+   - **Real file details not incorporated:**
+     - `src/agents/model/gateway.py` actual implementation (singleton pattern, ContextVar label, current LiteLLM/Cloudflare setup) is described in HLD/specs but not **verified** against repo-tree presence
+     - `tests/test_tracing.py` actual test structure (what headers are currently asserted, test function names) is **assumed** but not confirmed from real file
+     - `src/agents/skills/client.py` and `src/agents/runtime/runner.py` are referenced in breakdown/HLD but their actual import patterns and method usage are not validated
+   - **Impact:** Specs may prescribe refactors that don't align with actual file structure (e.g., if `_add_session_header` doesn't exist, or ContextVar is already renamed)
 
-- **Missing `specs/02.md` and `specs/03.md`**: tickets.md lists 3 child tickets (01, 02, 03) but only `specs/01.md` is present. Breakdown lists Story 2 (repo: agent) and Story 3 (repo: agent), so `specs/02.md` and `specs/03.md` should exist per ADLC rule 3 (same concrete file paths everywhere). **Fix**: Create `specs/02.md` (Story 2) and `specs/03.md` (Story 3) or note they are missing.
+4. **Test count alignment issue:**
+   - **Requirements AC-6:** "all existing and new automated tests pass" + "9 new tests: 6 in `tests/test_gateway.py` and 3 rewritten in `tests/test_tracing.py`"
+   - **Breakdown Story 3 test count:** "9 automated tests (6 gateway + 3 tracing)"
+   - **Story 01 LLD test count:** 0 new tests
+   - **Story 02 LLD test count:** 0 new tests
+   - **Story 03 LLD test count:** 9 tests (6 gateway + 3 tracing)
+   - **Sum:** 0 + 0 + 9 = 9 ✅ (correct)
+   - **But:** `specs/01.md` "Test count: 0 new automated tests (Story 3 adds 6 gateway tests...)" — this note is **misleading** because `specs/01.md` covers all three stories per `change_requests.md`, so it should say "Story 3 section adds 9 tests" or clarify scope
+   - **Clarification needed:** If `specs/01.md` is the single spec for all tickets, its "Tests" section should aggregate all three stories' tests (0+0+9=9), not reference Story 3 as future work
 
-- **HLD outcome vs LLD prescription (minor)**: HLD "Contracts" section says "Client uses Anthropic SDK default base URL when `ANTHROPIC_BASE_URL` not set" (outcome-focused). Story 1 LLD "Client Instantiation Logic" step 3 says "Only pass `base_url` kwarg to `AsyncAnthropic()` if value is non-empty" (implementation prescription). This is a borderline violation of ADLC rule 3 (HLD describes outcomes, not language-specific syntax). However, the HLD "Architecture Decisions" AD-2 says "Pass `base_url` to `AsyncAnthropic` constructor only when `ANTHROPIC_BASE_URL` is set" (prescriptive). **Verdict**: The HLD itself prescribes constructor kwargs (violates rule 3's "do not prescribe language-specific syntax" unless repo context requires it). Since the repo context is Python (established by ticket and project-context), and the HLD "Contracts" section mixes outcome and implementation, this is a **minor inconsistency** but not a hard FAIL unless the reviewer enforces strict HLD-outcome-only policy. **Fix (if strict)**: Move constructor kwarg details to LLD; HLD says only "client configured from ANTHROPIC_API_KEY, optionally overridden by ANTHROPIC_BASE_URL."
+5. **File path verification gap:**
+   - **HLD, breakdown, and story LLDs** claim paths are "confirmed in repo-tree"
+   - **Repo-tree shows:** `src/agents/model/gateway.py` ✅, `src/agents/runtime/runner.py` ✅, `src/agents/skills/client.py` ✅, `README.md` ✅, `pyproject.toml` ✅, `model/policy.yaml` ❌ (not listed)
+   - **Missing in repo-tree:** `model/policy.yaml`, `tests/test_tracing.py`, `tests/test_gateway.py` (new), `.env.example`
+   - **Issue:** Specs claim "path confirmed in repo-tree" for files not shown in provided tree (e.g., `model/policy.yaml`), and `.env.example` is described as "standard config file" without confirmation
+   - **Impact:** Cannot verify file existence for Story 2 changes (`model/policy.yaml`, `.env.example`) or Story 3 test file rewrites (`tests/test_tracing.py`)
 
-- **Verification count mismatch (Breakdown vs Story 3)**: Breakdown Story 3 says "Verification Approach: ... Test count: 8 automated tests (5 in `test_gateway.py`, 3 in rewritten `test_tracing.py`)". Story 3 LLD "Verification Steps" lists 5 steps (Step 1-5), where Step 1 runs gateway tests (6 cases per AC-1), Step 2 runs tracing tests (3 cases per AC-2), Steps 3-5 are validation steps (full suite, grep, manual). The "Verification Steps" section does not say "8 automated tests" — it says "Step 1: Expected: 6 tests pass" and "Step 2: Expected: 3 tests pass", totaling 9. **Fix**: Align breakdown (8 vs 9) and Story 3 verification step counts.
+6. **Spec structure contradiction:**
+   - `change_requests.md` states: "One spec file (specs/01.md) covers all three stories; do not require specs/02.md or specs/03.md"
+   - **But:** `tickets.md` lists three child tickets (PER-65, PER-66, PER-67) and `proposed_tickets.md` describes three separate tickets with separate AC mappings
+   - **Contradiction:** If one spec covers all three stories, why are there three separate ticket IDs in `tickets.md`?
+   - **Expected:** Either (a) consolidate to one ticket with one spec, or (b) clarify that `specs/01.md` is a "master spec" covering multiple tickets (non-standard pattern)
 
-**Summary of concrete mismatches**:
-1. AC count: 5 (requirements) vs 22 (breakdown story ACs) — not 1:1.
-2. Test count: breakdown says 8, Story 3 LLD says 9 (6 gateway + 3 tracing).
-3. File paths: `src/agents/model/gateway.py`, `runtime/runner.py`, `model/policy.yaml`, `tests/test_gateway.py`, `tests/test_tracing.py` listed in LLDs but repo-tree shows empty `existing files:` — unverifiable against tree.
-4. Missing `specs/02.md` and `specs/03.md` (only `specs/01.md` present).
-5. Repo name: ticket says `trinet_agents`, tickets.md says `agent` — inconsistency.
-6. HLD prescribes constructor kwargs (borderline rule 3 violation; outcome vs syntax).
+**Summary:** Main issues are missing spec files vs. ticket count, incomplete AC coverage listing in `proposed_tickets.md`, unverified real file details, and file path claims that cannot be validated against the provided repo-tree.
