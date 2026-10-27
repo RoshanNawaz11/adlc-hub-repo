@@ -31,29 +31,30 @@ repos:
     role: api
     base: main
     commands:
-      test: "python -m pytest -q"
-      lint: "python -m compileall -q src"
+      # Use worktree .venv (system python has no fastapi/pytest). Package lives in app/.
+      test: ".venv/bin/python -m pytest -q"
+      lint: ".venv/bin/python -m compileall -q app"
   agent:
     path_key: agent
-    url: https://github.com/goofranshaikh-eng/adlc-agents.git
+    url: https://github.com/RoshanNawaz11/adlc-agents.git
     role: agents
     base: main
     commands:
-      test: "python -m pytest -q"
-      lint: "python -m compileall -q src"
+      test: ".venv/bin/python -m pytest -q"
+      lint: ".venv/bin/python -m compileall -q src"
   mcp:
     path_key: mcp
     url: https://github.com/goofranshaikh-eng/adlc-mcp-server.git
     role: agents
     base: main
     commands:
-      test: "python -m pytest -q"
-      lint: "python -m compileall -q src"
+      test: ".venv/bin/python -m pytest -q"
+      lint: ".venv/bin/python -m compileall -q mcp"
 dependency_order: [graphql, mcp, agent]
 policies:
-  spec_review: cli                # cli | hub_pr (hub_pr = human-only spec review)
+  spec_review: hub_pr                # cli | hub_pr (hub_pr = human-only spec review)
   feature_pr_agent_review: true
-  feature_pr_human_review: none  # required | optional | none
+  feature_pr_human_review: required  # required | optional | none
   lease_hours: 48
 budgets:
   per_feature_anthropic_usd: 15
