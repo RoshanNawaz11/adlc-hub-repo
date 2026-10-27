@@ -21,7 +21,7 @@
       "why": "standard track template",
       "instructions": "",
       "auto": false,
-      "status": "pending",
+      "status": "done",
       "rerun": false
     },
     {
@@ -30,7 +30,7 @@
       "why": "Normalize proposed tickets after TPM approval.",
       "instructions": "",
       "auto": true,
-      "status": "pending",
+      "status": "done",
       "rerun": false
     },
     {
@@ -39,7 +39,7 @@
       "why": "standard track template",
       "instructions": "",
       "auto": false,
-      "status": "pending",
+      "status": "done",
       "rerun": false
     },
     {
@@ -48,7 +48,7 @@
       "why": "standard track template",
       "instructions": "",
       "auto": false,
-      "status": "pending",
+      "status": "done",
       "rerun": false
     },
     {
@@ -57,7 +57,7 @@
       "why": "standard track template",
       "instructions": "",
       "auto": false,
-      "status": "pending",
+      "status": "done",
       "rerun": false
     },
     {
@@ -66,7 +66,7 @@
       "why": "standard track template",
       "instructions": "",
       "auto": false,
-      "status": "pending",
+      "status": "done",
       "rerun": false
     },
     {

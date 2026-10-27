@@ -11,12 +11,12 @@ Track template (standard).
 ## Steps
 
 1. [x] **analyst (requirements)** — standard track template
-2. [ ] **tpm_gate (review)** — standard track template
-3. [ ] **ticketize (normalize)** _(auto)_ — Normalize proposed tickets after TPM approval.
-4. [ ] **architect (hld)** — standard track template
-5. [ ] **scrum_master (breakdown)** — standard track template
-6. [ ] **designer (lld)** — standard track template
-7. [ ] **test_architect (tests)** — standard track template
+2. [x] **tpm_gate (review)** — standard track template
+3. [x] **ticketize (normalize)** _(auto)_ — Normalize proposed tickets after TPM approval.
+4. [x] **architect (hld)** — standard track template
+5. [x] **scrum_master (breakdown)** — standard track template
+6. [x] **designer (lld)** — standard track template
+7. [x] **test_architect (tests)** — standard track template
 8. [ ] **critic (consistency_check)** — standard track template
 9. [ ] **merge_pack (pack)** _(auto)_ — Pack per-ticket specs into merged_plan.md for review.
 10. [ ] **architect_gate (review)** _(auto)_ — Human approval of specs and this plan before Dev.
