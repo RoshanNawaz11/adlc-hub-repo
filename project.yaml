@@ -36,9 +36,8 @@ repos:
       lint: ".venv/bin/python -m compileall -q app"
   agent:
     path_key: agent
-    url: https://github.com/RoshanNawaz11/adlc-agents.git
-    role: agents
-    base: main
+    url: https://github.com/RoshanNawaz11/trinet-adlc-agents
+    base: dummy_adlc
     commands:
       test: ".venv/bin/python -m pytest -q"
       lint: ".venv/bin/python -m compileall -q src"

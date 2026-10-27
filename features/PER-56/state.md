@@ -1,20 +1,20 @@
 ---
 schema_version: 1
 key: PER-56
-status: waiting_architect_review
-current_node: architect_gate
+status: in_development
+current_node: dev
 track: standard
 involved_repos:
 - agent
 depends_on: []
 owner: regularinsaan
-lease_until: '2026-10-29T10:50:06.666378+00:00'
-revision: 62
+lease_until: '2026-10-29T11:18:47.066670+00:00'
+revision: 74
 hub_sha: null
 ticket_hash: e4201be5cf8dcd29
 jira_hash: e4201be5cf8dcd29
-tpm_approved: false
-specs_locked: false
+tpm_approved: true
+specs_locked: true
 skills_lock:
   bmad: 1cbcfa272fe65787c06a1fa164a901f46117cca7
 stories:
@@ -34,7 +34,7 @@ gate_rounds: {}
 pr_ids:
   hub_arch: '1'
   hub: '1'
-waiting_for: architect_review
+waiting_for: null
 tokens_in: 1371118
 tokens_out: 143152
 cost_anthropic_usd: 6.260294
@@ -116,6 +116,24 @@ history:
 - node: architect_gate
   note: awaiting human hub PR approval
   at: '2026-10-27T11:17:31.731450+00:00'
+- node: architect_gate
+  note: checkpoint push rejected
+  at: '2026-10-27T11:17:36.304186+00:00'
+- node: catch_up
+  note: "hub comments \u2192 planner revision applied"
+  at: '2026-10-27T11:17:36.370815+00:00'
+- node: architect_gate
+  note: approved via hub PR (reconcile)
+  at: '2026-10-27T11:18:46.847338+00:00'
+- node: architect_gate
+  note: "forge unlocked architect_review \u2192 resume"
+  at: '2026-10-27T11:18:47.066835+00:00'
+- node: dev
+  note: starting
+  at: '2026-10-27T11:18:48.463290+00:00'
+- node: dev
+  note: starting
+  at: '2026-10-27T11:49:22.525065+00:00'
 ---
 
 # Feature state

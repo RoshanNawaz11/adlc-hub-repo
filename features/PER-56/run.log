@@ -110,3 +110,9 @@
 2026-10-27T11:17:18.762957+00:00 heartbeat architect_gate
 2026-10-27T11:17:18.780565+00:00 node start architect_gate
 2026-10-27T11:17:31.735996+00:00 node end architect_gate waiting=architect_review
+2026-10-27T11:18:48.386810+00:00 heartbeat dev
+2026-10-27T11:18:48.417036+00:00 node start dev
+2026-10-27T11:18:48.591251+00:00 node fail dev: [Errno 2] No such file or directory: PosixPath('/mnt/c/adlc-agents/adlc-agents')
+2026-10-27T11:49:22.488720+00:00 heartbeat dev
+2026-10-27T11:49:22.501718+00:00 node start dev
+2026-10-27T11:49:26.143640+00:00 dev cursor 01-agent attempt=1

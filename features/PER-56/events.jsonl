@@ -32,3 +32,4 @@
 {"at": "2026-10-27T11:15:00.314727+00:00", "node": "test_architect", "event": "llm_ok", "model": "claude-sonnet-4-5-20250929", "in": 81716, "out": 6763, "cache_read": 0, "usd": 0.346593, "ms": 113914, "ok": true, "dry_run": false, "error": null}
 {"at": "2026-10-27T11:16:17.061198+00:00", "node": "test_architect", "event": "llm_ok", "model": "claude-sonnet-4-5-20250929", "in": 75777, "out": 4265, "cache_read": 0, "usd": 0.291306, "ms": 76526, "ok": true, "dry_run": false, "error": null}
 {"at": "2026-10-27T11:17:18.009360+00:00", "node": "critic", "event": "llm_ok", "model": "claude-sonnet-4-5-20250929", "in": 73300, "out": 2901, "cache_read": 0, "usd": 0.263415, "ms": 59856, "ok": true, "dry_run": false, "error": null}
+{"at": "2026-10-27T11:18:48.546918+00:00", "node": "dev", "event": "fail", "ok": false, "error": "[Errno 2] No such file or directory: PosixPath('/mnt/c/adlc-agents/adlc-agents')"}
