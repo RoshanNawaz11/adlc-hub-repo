@@ -13,11 +13,11 @@ Remove LiteLLM and Cloudflare AI Gateway proxies and call Anthropic directly; th
 
 ## Steps
 
-1. [ ] **analyst (inline_story)** — The ticket already contains detailed requirements with clear AC; convert to Given/When/Then format with implementation notes.
+1. [x] **analyst (inline_story)** — The ticket already contains detailed requirements with clear AC; convert to Given/When/Then format with implementation notes.
    - focus: Focus on the model gateway refactor, tracing setup changes, test updates, and documentation cleanup. Keep the out-of-scope boundaries explicit.
-2. [ ] **designer (lld)** — The change touches multiple files (gateway.py, .env.example, tests, docs) with specific refactoring steps that need a concrete file plan.
+2. [x] **designer (lld)** — The change touches multiple files (gateway.py, .env.example, tests, docs) with specific refactoring steps that need a concrete file plan.
    - focus: Provide a precise file-by-file plan for removing LiteLLM/Cloudflare code, rewiring the Anthropic client, updating tracing comments, rewriting docs, and adding new gateway tests. Include the exact lines or sections to change in gateway.py.
-3. [ ] **test_architect (tests)** — The ticket specifies new test cases in test_gateway.py and modifications to test_tracing.py that need mapping to acceptance criteria.
+3. [x] **test_architect (tests)** — The ticket specifies new test cases in test_gateway.py and modifications to test_tracing.py that need mapping to acceptance criteria.
    - focus: Map the four test_gateway.py scenarios (missing key, default URL, custom URL, client identity) and the test_tracing.py changes (remove header tests, add traceparent stability test) to the AC.
 4. [ ] **architect_gate (review)** _(auto)_ — Human approval of specs and this plan before Dev.
 5. [ ] **dev** _(auto)_ — Loop delivery.
