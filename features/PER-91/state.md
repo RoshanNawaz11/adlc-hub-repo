@@ -1,15 +1,15 @@
 ---
 schema_version: 1
 key: PER-91
-status: in_development
-current_node: dev
+status: changes_requested
+current_node: pr_review
 track: standard
 involved_repos:
 - agent
 depends_on: []
 owner: regularinsaan
 lease_until: '2026-11-01T10:56:42.227609+00:00'
-revision: 50
+revision: 52
 hub_sha: null
 ticket_hash: 30f0e373f92f210f
 jira_hash: 30f0e373f92f210f
@@ -30,10 +30,10 @@ pr_ids:
   hub: '4'
   hub_plan: '5'
   agent: '1'
-waiting_for: null
-tokens_in: 137866
-tokens_out: 35329
-cost_anthropic_usd: 0.925961
+waiting_for: spec_revision
+tokens_in: 139582
+tokens_out: 35421
+cost_anthropic_usd: 0.928137
 history:
 - node: intake
   note: snapshot written
@@ -180,6 +180,18 @@ history:
 - node: dev
   note: done 01-agent
   at: '2026-10-30T11:10:29.258729+00:00'
+- node: pre_pr_qa
+  note: report written
+  at: '2026-10-30T11:10:34.926801+00:00'
+- node: open_pr
+  note: push agent ok
+  at: '2026-10-30T11:10:37.840297+00:00'
+- node: pr_review
+  note: resolved agent:4422946932
+  at: '2026-10-30T11:10:46.921780+00:00'
+- node: pr_review
+  note: "major issue \u2192 delta spec gate (human) after minor/moderate auto-fix"
+  at: '2026-10-30T11:10:46.934952+00:00'
 ---
 
 # Feature state
