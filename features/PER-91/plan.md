@@ -27,10 +27,10 @@ No spec changes needed; the inline comment about setting ANTHROPIC_API_KEY in en
 1. [x] **analyst (inline_story)** — The ticket already contains detailed requirements with clear AC; convert to Given/When/Then format with implementation notes.
 2. [x] **designer (lld)** — The change touches multiple files (gateway.py, .env.example, tests, docs) with specific refactoring steps that need a concrete file plan.
 3. [x] **test_architect (tests)** — The ticket specifies new test cases in test_gateway.py and modifications to test_tracing.py that need mapping to acceptance criteria.
-4. [ ] **architect_gate (review)** _(auto)_ _(rerun)_ — Human approval of specs and this plan before Dev.
-5. [ ] **dev** _(auto)_ — Loop delivery.
-6. [ ] **pre_pr_qa** _(auto)_ — Loop delivery.
-7. [ ] **open_pr** _(auto)_ — Loop delivery.
+4. [x] **architect_gate (review)** _(auto)_ — Human approval of specs and this plan before Dev.
+5. [x] **dev** _(auto)_ — Loop delivery.
+6. [x] **pre_pr_qa** _(auto)_ — Loop delivery.
+7. [x] **open_pr** _(auto)_ — Loop delivery.
 8. [ ] **pr_review** _(auto)_ — Loop delivery.
 9. [ ] **merge** _(auto)_ — Loop delivery.
 

@@ -315,16 +315,23 @@
        """Traceparent is stable within a session and differs between sessions."""
        from agents.model.gateway import session_id, traceparent
        
-       # First session
+       # Test context-var path (session_id.set() then traceparent() with no arg)
        session_id.set("session-1")
        trace_1a = traceparent()
        trace_1b = traceparent()
-       assert trace_1a == trace_1b, "traceparent should be stable for same session"
+       assert trace_1a == trace_1b, "traceparent should be stable for same session (context-var path)"
        
-       # Second session
        session_id.set("session-2")
        trace_2 = traceparent()
-       assert trace_2 != trace_1a, "traceparent should differ between sessions"
+       assert trace_2 != trace_1a, "traceparent should differ between sessions (context-var path)"
+       
+       # Test explicit session id path (traceparent(sid) with explicit arg)
+       trace_exp_1a = traceparent("session-1")
+       trace_exp_1b = traceparent("session-1")
+       assert trace_exp_1a == trace_exp_1b, "traceparent should be stable for same session (explicit arg)"
+       
+       trace_exp_2 = traceparent("session-2")
+       assert trace_exp_2 != trace_exp_1a, "traceparent should differ between sessions (explicit arg)"
    ```
 
 ---
@@ -422,7 +429,7 @@ def test_client_identity(monkeypatch):
 2. **Error handling test:** Confirm `MissingAPIKeyError` with correct message when key absent
 3. **Base URL tests:** Verify SDK default vs. custom URL usage
 4. **Client identity test:** Confirm single instance returned by both methods
-5. **Tracing tests:** Verify `traceparent()` stability within a session and variance between sessions
+5. **Tracing tests:** Verify `traceparent()` stability within a session and variance between sessions, covering both context-var path and explicit session id argument path
 6. **Static verification:** `grep` command confirms complete removal of old references
 7. **Integration test:** Manual check with real API key (documented in PR description)
 
@@ -460,7 +467,7 @@ This section maps each test case to its corresponding acceptance criteria, ensur
 
 2. **`test_traceparent_stable_for_session`** (new)
    - **Maps to:** AC4 (traceparent stability), AC9
-   - **Verifies:** `traceparent()` returns stable value within one session and differs between sessions
+   - **Verifies:** `traceparent()` returns stable value within one session and differs between sessions, covering both the context-var path (`session_id.set()` then `traceparent()` with no arg) and the explicit session id argument path (`traceparent(sid)`)
 
 #### Integration Tests
 

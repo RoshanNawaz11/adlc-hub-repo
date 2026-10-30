@@ -51,8 +51,8 @@
       "why": "Human approval of specs and this plan before Dev.",
       "instructions": "",
       "auto": true,
-      "status": "pending",
-      "rerun": true
+      "status": "done",
+      "rerun": false
     },
     {
       "node": "dev",
@@ -60,7 +60,7 @@
       "why": "Loop delivery.",
       "instructions": "",
       "auto": true,
-      "status": "pending",
+      "status": "done",
       "rerun": false
     },
     {
@@ -69,7 +69,7 @@
       "why": "Loop delivery.",
       "instructions": "",
       "auto": true,
-      "status": "pending",
+      "status": "done",
       "rerun": false
     },
     {
@@ -78,7 +78,7 @@
       "why": "Loop delivery.",
       "instructions": "",
       "auto": true,
-      "status": "pending",
+      "status": "done",
       "rerun": false
     },
     {

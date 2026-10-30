@@ -1,0 +1,17 @@
+{
+  "comment_ids": [
+    "4422946932"
+  ],
+  "tier": "moderate",
+  "stories": [
+    "01-agent"
+  ],
+  "items": [
+    {
+      "comment_id": "4422946932",
+      "repo": "agent",
+      "path": "tests/test_tracing.py",
+      "tier": "moderate"
+    }
+  ]
+}

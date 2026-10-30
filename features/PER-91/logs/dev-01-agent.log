@@ -13,3 +13,13 @@ Model calls and skill uploads now go through one Anthropic client built from `AN
 - `tests/test_tracing.py` — header tests removed; `traceparent()` stability test added
 
 **Manual check for the PR:** with a real `ANTHROPIC_API_KEY` and no LiteLLM process running, one service order should complete via `run_so.py`, and a skill upload via `skills/client.py` should succeed.
+The explicit-argument contract for `traceparent()` is now covered in `tests/test_tracing.py`.
+
+`test_traceparent_stable_for_session` already checked the context-var path (`session_id.set()` then `traceparent()` with no argument). It now also checks the explicit session id path that `trace_id()` uses:
+
+- `traceparent("session-1") == traceparent("session-1")`
+- `traceparent("session-1") != traceparent("session-2")`
+
+`uv run pytest tests/test_tracing.py -q` passed (2 tests).
+
+**File changed:** `tests/test_tracing.py`
