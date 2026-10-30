@@ -1,0 +1,15 @@
+Model calls and skill uploads now go through one Anthropic client built from `ANTHROPIC_API_KEY`. LangWatch remains the tracer, and `session_id` is labeled `run_session_id`.
+
+`uv run pytest -q`: **114 passed, 1 skipped**. A search of `src`, `tests`, `docs`, `README.md`, and `.env.example` for LiteLLM and Cloudflare gateway references returns nothing.
+
+**Files changed**
+- `src/agents/model/gateway.py` — one `AsyncAnthropic` client; `require_client()` and `require_skills_client()` return it; missing `ANTHROPIC_API_KEY` raises `MissingAPIKeyError`
+- `src/agents/runtime/runner.py` — tracing comments updated for LangWatch
+- `src/agents/model/policy.yaml` — header comment only; models and settings unchanged
+- `.env.example` — `ANTHROPIC_API_KEY` required, `ANTHROPIC_BASE_URL` optional and commented out, LangWatch enabled
+- `README.md` — model route, observability, env vars, and troubleshooting rewritten
+- `docs/claude-via-litellm-cloudflare.md` — deleted
+- `tests/test_gateway.py` — new client tests
+- `tests/test_tracing.py` — header tests removed; `traceparent()` stability test added
+
+**Manual check for the PR:** with a real `ANTHROPIC_API_KEY` and no LiteLLM process running, one service order should complete via `run_so.py`, and a skill upload via `skills/client.py` should succeed.
