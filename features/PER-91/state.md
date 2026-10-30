@@ -1,0 +1,74 @@
+---
+schema_version: 1
+key: PER-91
+status: waiting_architect_review
+current_node: architect_gate
+track: standard
+involved_repos:
+- agent
+depends_on: []
+owner: regularinsaan
+lease_until: '2026-11-01T10:39:11.463588+00:00'
+revision: 25
+hub_sha: null
+ticket_hash: 30f0e373f92f210f
+jira_hash: 30f0e373f92f210f
+tpm_approved: false
+specs_locked: false
+skills_lock:
+  bmad: 1cbcfa272fe65787c06a1fa164a901f46117cca7
+stories:
+- 01-agent
+child_ticket_keys: []
+critic_iterations: 0
+dev_retries: 0
+pr_revision_rounds: 0
+gate_rounds: {}
+pr_ids:
+  hub_plan: '3'
+  hub_arch: '4'
+  hub: '4'
+waiting_for: architect_review
+tokens_in: 66117
+tokens_out: 18797
+cost_anthropic_usd: 0.479934
+history:
+- node: intake
+  note: snapshot written
+  at: '2026-10-30T10:24:21.178231+00:00'
+- node: triage
+  note: llm classifier
+  at: '2026-10-30T10:24:22.259222+00:00'
+- node: planner
+  note: v1 source=llm complexity=moderate steps=['analyst', 'designer', 'test_architect']
+    skipped=['critic']
+  at: '2026-10-30T10:24:36.091903+00:00'
+- node: plan_review
+  note: awaiting human hub PR approval (plan)
+  at: '2026-10-30T10:25:08.417990+00:00'
+- node: plan_review
+  note: approved via hub PR (reconcile)
+  at: '2026-10-30T10:39:11.410583+00:00'
+- node: plan_review
+  note: "forge unlocked plan_review \u2192 resume"
+  at: '2026-10-30T10:39:11.463662+00:00'
+- node: analyst
+  note: wrote requirements.md
+  at: '2026-10-30T10:40:20.040992+00:00'
+- node: analyst
+  note: quick inline story
+  at: '2026-10-30T10:41:21.998019+00:00'
+- node: designer
+  note: lld updated
+  at: '2026-10-30T10:42:34.233969+00:00'
+- node: test_architect
+  note: tests appended
+  at: '2026-10-30T10:43:54.375452+00:00'
+- node: architect_gate
+  note: awaiting human hub PR approval
+  at: '2026-10-30T10:44:21.701284+00:00'
+---
+
+# Feature state
+
+See frontmatter for machine-readable fields.
