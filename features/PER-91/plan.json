@@ -2,8 +2,8 @@
   "schema_version": 1,
   "key": "PER-91",
   "source": "llm",
-  "complexity": "moderate",
-  "summary": "Remove LiteLLM and Cloudflare AI Gateway proxies and call Anthropic directly; this is a moderate refactor of the model gateway layer with test updates, requiring design for the concrete file plan.",
+  "complexity": "simple",
+  "summary": "Small refactor in one repo removing LiteLLM/Cloudflare routing and calling Anthropic directly; the existing plan is correct and the inline comment does not require spec changes.",
   "track_hint": "standard",
   "loop": "story_with_design",
   "delivery": "delivery",
@@ -22,7 +22,7 @@
       "node": "analyst",
       "activity": "inline_story",
       "why": "The ticket already contains detailed requirements with clear AC; convert to Given/When/Then format with implementation notes.",
-      "instructions": "Focus on the model gateway refactor, tracing setup changes, test updates, and documentation cleanup. Keep the out-of-scope boundaries explicit.",
+      "instructions": "",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -31,7 +31,7 @@
       "node": "designer",
       "activity": "lld",
       "why": "The change touches multiple files (gateway.py, .env.example, tests, docs) with specific refactoring steps that need a concrete file plan.",
-      "instructions": "Provide a precise file-by-file plan for removing LiteLLM/Cloudflare code, rewiring the Anthropic client, updating tracing comments, rewriting docs, and adding new gateway tests. Include the exact lines or sections to change in gateway.py.",
+      "instructions": "",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -40,7 +40,7 @@
       "node": "test_architect",
       "activity": "tests",
       "why": "The ticket specifies new test cases in test_gateway.py and modifications to test_tracing.py that need mapping to acceptance criteria.",
-      "instructions": "Map the four test_gateway.py scenarios (missing key, default URL, custom URL, client identity) and the test_tracing.py changes (remove header tests, add traceparent stability test) to the AC.",
+      "instructions": "",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -52,7 +52,7 @@
       "instructions": "",
       "auto": true,
       "status": "pending",
-      "rerun": false
+      "rerun": true
     },
     {
       "node": "dev",
@@ -109,16 +109,42 @@
   "suggested_roles": [],
   "suggested_loops": [],
   "notes": [],
-  "created_at": "2026-10-30T10:24:36.069586+00:00",
-  "version": 1,
-  "trigger": "ticket",
-  "gate": null,
-  "feedback": [],
+  "created_at": "2026-10-30T10:47:47.811945+00:00",
+  "version": 2,
+  "trigger": "review",
+  "gate": "architect_review",
+  "feedback": [
+    {
+      "id": "hub#4:inline-4422809044",
+      "source": "pr_inline",
+      "body": "anthropic key can be set later in env it is not set in the env",
+      "author": "RoshanNawaz11",
+      "path": "features/PER-91/stories/01-agent.md",
+      "line": 20,
+      "pr": "hub#4"
+    }
+  ],
   "feedback_errors": [],
-  "seen_feedback_ids": [],
-  "change_summary": "",
-  "changes": null,
-  "addressed": [],
+  "seen_feedback_ids": [
+    "hub#4:inline-4422809044"
+  ],
+  "change_summary": "No spec changes needed; the inline comment about setting ANTHROPIC_API_KEY in env is acknowledged but does not contradict the ticket requirements or existing specs.",
+  "changes": {
+    "added": [],
+    "removed": [],
+    "rerun": [],
+    "kept": [
+      "analyst",
+      "designer",
+      "test_architect"
+    ]
+  },
+  "addressed": [
+    {
+      "feedback_id": "hub#4:inline-4422809044",
+      "change": "The comment notes that ANTHROPIC_API_KEY can be set later in env if not already set. This aligns with the existing spec: AC3 already specifies that MissingAPIKeyError is raised when the key is unset, and .env.example already documents ANTHROPIC_API_KEY= as required. No spec revision needed; the implementation will handle the env var lookup at runtime as designed."
+    }
+  ],
   "unresolved_questions": [],
   "requires_review": true
 }

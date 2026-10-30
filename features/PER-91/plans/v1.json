@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "key": "PER-91",
+  "source": "llm",
+  "complexity": "moderate",
+  "summary": "Remove LiteLLM and Cloudflare AI Gateway proxies and call Anthropic directly; this is a moderate refactor of the model gateway layer with test updates, requiring design for the concrete file plan.",
+  "track_hint": "standard",
+  "loop": "story_with_design",
+  "delivery": "delivery",
+  "pr_fix": [
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "loops": [
+    "story_with_design",
+    "delivery",
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "steps": [
+    {
+      "node": "analyst",
+      "activity": "inline_story",
+      "why": "The ticket already contains detailed requirements with clear AC; convert to Given/When/Then format with implementation notes.",
+      "instructions": "Focus on the model gateway refactor, tracing setup changes, test updates, and documentation cleanup. Keep the out-of-scope boundaries explicit.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "designer",
+      "activity": "lld",
+      "why": "The change touches multiple files (gateway.py, .env.example, tests, docs) with specific refactoring steps that need a concrete file plan.",
+      "instructions": "Provide a precise file-by-file plan for removing LiteLLM/Cloudflare code, rewiring the Anthropic client, updating tracing comments, rewriting docs, and adding new gateway tests. Include the exact lines or sections to change in gateway.py.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "test_architect",
+      "activity": "tests",
+      "why": "The ticket specifies new test cases in test_gateway.py and modifications to test_tracing.py that need mapping to acceptance criteria.",
+      "instructions": "Map the four test_gateway.py scenarios (missing key, default URL, custom URL, client identity) and the test_tracing.py changes (remove header tests, add traceparent stability test) to the AC.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "architect_gate",
+      "activity": "review",
+      "why": "Human approval of specs and this plan before Dev.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "dev",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pre_pr_qa",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "open_pr",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pr_review",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "merge",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    }
+  ],
+  "skipped": [
+    {
+      "node": "critic",
+      "why": "Single inline story with no separate requirements, HLD or breakdown documents to cross-check for consistency."
+    }
+  ],
+  "suggested_roles": [],
+  "suggested_loops": [],
+  "notes": [],
+  "created_at": "2026-10-30T10:24:36.069586+00:00",
+  "version": 1,
+  "trigger": "ticket",
+  "gate": null,
+  "feedback": [],
+  "feedback_errors": [],
+  "seen_feedback_ids": [],
+  "change_summary": "",
+  "changes": null,
+  "addressed": [],
+  "unresolved_questions": [],
+  "requires_review": true
+}

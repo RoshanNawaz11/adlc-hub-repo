@@ -24,3 +24,8 @@
 2026-10-30T10:43:54.483347+00:00 heartbeat architect_gate
 2026-10-30T10:43:54.496210+00:00 node start architect_gate
 2026-10-30T10:44:21.710456+00:00 node end architect_gate waiting=architect_review
+2026-10-30T10:47:38.175481+00:00 heartbeat planner
+2026-10-30T10:47:47.796623+00:00 planner llm model=claude-sonnet-4-5-20250929 in=6063 out=502 usd=0.025719
+2026-10-30T10:50:55.711538+00:00 heartbeat architect_gate
+2026-10-30T10:50:55.727196+00:00 node start architect_gate
+2026-10-30T10:51:05.569845+00:00 node end architect_gate waiting=architect_review
