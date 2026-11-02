@@ -1,6 +1,6 @@
 {
   "comment_ids": [
-    "4422946932"
+    "6569769336"
   ],
   "tier": "moderate",
   "stories": [
@@ -8,9 +8,9 @@
   ],
   "items": [
     {
-      "comment_id": "4422946932",
+      "comment_id": "6569769336",
       "repo": "agent",
-      "path": "tests/test_tracing.py",
+      "path": null,
       "tier": "moderate"
     }
   ]

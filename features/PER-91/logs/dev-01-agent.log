@@ -23,3 +23,11 @@ The explicit-argument contract for `traceparent()` is now covered in `tests/test
 `uv run pytest tests/test_tracing.py -q` passed (2 tests).
 
 **File changed:** `tests/test_tracing.py`
+`ModelGateway()` no longer raises when `ANTHROPIC_API_KEY` is unset. `require_client()` and `require_skills_client()` both call `_ensure_client()`, which raises `MissingAPIKeyError` with the message `"ANTHROPIC_API_KEY is not set"`. The existing gateway test is unchanged and still covers that path.
+
+`uv run pytest -q`: 114 passed, 1 skipped.
+
+Files changed:
+
+- `src/agents/model/gateway.py` — client creation is deferred until a require method is called. Policy loading in `__init__` is unchanged.
+- `README.md` — the missing-key sentence now says the error comes from the require methods, not from construction.

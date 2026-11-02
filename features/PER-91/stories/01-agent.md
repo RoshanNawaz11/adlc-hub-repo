@@ -135,17 +135,9 @@
    - Replace with:
      ```python
      def __init__(self):
-         api_key = os.getenv("ANTHROPIC_API_KEY")
-         if not api_key:
-             raise MissingAPIKeyError("ANTHROPIC_API_KEY is not set")
-         
-         kwargs = {"api_key": api_key}
-         base_url = os.getenv("ANTHROPIC_BASE_URL")
-         if base_url:
-             kwargs["base_url"] = base_url
-         
-         self._client = anthropic.AsyncAnthropic(**kwargs)
+         self._client = None
      ```
+   - **Note:** Client initialization is deferred to `require_client()` / `require_skills_client()` so that `ModelGateway()` does not raise when `ANTHROPIC_API_KEY` is unset. This matches AC3 and AC8's requirement that the error is raised from the `require_*` methods, not `__init__`.
 
 4. **`_build_client()` method:**
    - Delete entire method
@@ -156,35 +148,54 @@
 6. **`_add_session_header()` function:**
    - Delete entire function
 
-7. **`require_client()` method:**
+7. **Add new private method `_ensure_client()`:**
+   ```python
+   def _ensure_client(self) -> anthropic.AsyncAnthropic:
+       if self._client is not None:
+           return self._client
+       
+       api_key = os.getenv("ANTHROPIC_API_KEY")
+       if not api_key:
+           raise MissingAPIKeyError("ANTHROPIC_API_KEY is not set")
+       
+       kwargs = {"api_key": api_key}
+       base_url = os.getenv("ANTHROPIC_BASE_URL")
+       if base_url:
+           kwargs["base_url"] = base_url
+       
+       self._client = anthropic.AsyncAnthropic(**kwargs)
+       return self._client
+   ```
+
+8. **`require_client()` method:**
    - Replace body with:
      ```python
      def require_client(self) -> anthropic.AsyncAnthropic:
-         return self._client
+         return self._ensure_client()
      ```
 
-8. **`require_skills_client()` method:**
+9. **`require_skills_client()` method:**
    - Replace body with:
      ```python
      def require_skills_client(self) -> anthropic.AsyncAnthropic:
-         return self._client
+         return self._ensure_client()
      ```
 
-9. **Keep unchanged:**
-   - `traceparent()` function (except any internal comments referencing LiteLLM)
-   - `trace_id()` function
-   - `session_id` ContextVar usage (only the label changes as noted above)
+10. **Keep unchanged:**
+    - `traceparent()` function (except any internal comments referencing LiteLLM)
+    - `trace_id()` function
+    - `session_id` ContextVar usage (only the label changes as noted above)
 
-10. **Remove all references to:**
+11. **Remove all references to:**
     - `LITELLM_BASE_URL` environment variable
     - `ANTHROPIC_GATEWAY_TOKEN` environment variable
     - `cf-aig-authorization` header
     - `event_hooks` parameter in Anthropic client construction
 
 **Interfaces:**
-- `ModelGateway.__init__()` → raises `MissingAPIKeyError` if `ANTHROPIC_API_KEY` unset
-- `ModelGateway.require_client()` → returns `anthropic.AsyncAnthropic`
-- `ModelGateway.require_skills_client()` → returns same `anthropic.AsyncAnthropic` instance
+- `ModelGateway.__init__()` → does not raise; defers client creation
+- `ModelGateway.require_client()` → returns `anthropic.AsyncAnthropic`; raises `MissingAPIKeyError` if `ANTHROPIC_API_KEY` unset
+- `ModelGateway.require_skills_client()` → returns same `anthropic.AsyncAnthropic` instance; raises `MissingAPIKeyError` if `ANTHROPIC_API_KEY` unset
 - `traceparent()` → returns `str` (W3C trace context header value)
 - `trace_id()` → returns `str` (extracted trace ID)
 
@@ -336,69 +347,68 @@
 
 ---
 
-### 8. `tests/test_gateway.py` (create new)
+### 8. `tests/test_gateway.py` (create)
 
 **Purpose:** Test new gateway client behavior with direct Anthropic setup.
 
-**Content:**
+**Changes:**
+
+1. **Create new file with the following tests:**
+
 ```python
-"""
-Tests for the model gateway's direct Anthropic client configuration.
-"""
+"""Tests for ModelGateway direct Anthropic client configuration."""
+
 import pytest
 from agents.model.gateway import ModelGateway, MissingAPIKeyError
 
 
 def test_missing_api_key_raises_error(monkeypatch):
-    """Missing ANTHROPIC_API_KEY raises MissingAPIKeyError."""
+    """Missing ANTHROPIC_API_KEY raises MissingAPIKeyError from require methods."""
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     
+    gateway = ModelGateway()  # __init__ does not raise
+    
     with pytest.raises(MissingAPIKeyError, match="ANTHROPIC_API_KEY is not set"):
-        gateway = ModelGateway()
         gateway.require_client()
     
     with pytest.raises(MissingAPIKeyError, match="ANTHROPIC_API_KEY is not set"):
-        gateway = ModelGateway()
         gateway.require_skills_client()
 
 
 def test_default_base_url_when_not_set(monkeypatch):
-    """Client uses SDK default base URL when ANTHROPIC_BASE_URL is not set."""
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-12345")
+    """Client uses SDK default base URL when ANTHROPIC_BASE_URL not set."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
     
     gateway = ModelGateway()
     client = gateway.require_client()
     
-    # SDK default is https://api.anthropic.com
     assert client.base_url == "https://api.anthropic.com"
 
 
 def test_custom_base_url_when_set(monkeypatch):
     """Client uses custom base URL when ANTHROPIC_BASE_URL is set."""
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-12345")
-    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://custom.example.com")
+    test_url = "https://custom.example.com"
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", test_url)
     
     gateway = ModelGateway()
     client = gateway.require_client()
     
-    assert client.base_url == "https://custom.example.com"
-    
-    # Verify no cf-aig-authorization header is added
-    # (The Anthropic SDK doesn't expose default_headers directly in all versions,
-    # so we verify by absence of the old header construction code)
-    # This is implicitly tested by the removal of _build_skills_client
+    assert client.base_url == test_url
+    # Verify no cf-aig-authorization header logic exists
+    # (implementation detail: client should not have Cloudflare headers)
 
 
 def test_client_identity(monkeypatch):
-    """require_client() and require_skills_client() return the same instance."""
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-12345")
+    """require_client() and require_skills_client() return same instance."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     
     gateway = ModelGateway()
-    client_a = gateway.require_client()
-    client_b = gateway.require_skills_client()
+    client1 = gateway.require_client()
+    client2 = gateway.require_skills_client()
     
-    assert client_a is client_b, "Both methods should return the same client instance"
+    assert client1 is client2
 ```
 
 ---
@@ -407,13 +417,17 @@ def test_client_identity(monkeypatch):
 
 ### Gateway Initialization
 
-1. Read `ANTHROPIC_API_KEY` from environment
-2. If unset → raise `MissingAPIKeyError("ANTHROPIC_API_KEY is not set")`
-3. Build `kwargs = {"api_key": api_key}`
-4. Read `ANTHROPIC_BASE_URL` from environment
-5. If set → add `kwargs["base_url"] = base_url`
-6. Create `self._client = anthropic.AsyncAnthropic(**kwargs)`
-7. Both `require_client()` and `require_skills_client()` return `self._client`
+1. `__init__()` sets `self._client = None` (deferred initialization)
+2. `_ensure_client()` called by `require_client()` and `require_skills_client()`:
+   - If `self._client` already exists → return it
+   - Read `ANTHROPIC_API_KEY` from environment
+   - If unset → raise `MissingAPIKeyError("ANTHROPIC_API_KEY is not set")`
+   - Build `kwargs = {"api_key": api_key}`
+   - Read `ANTHROPIC_BASE_URL` from environment
+   - If set → add `kwargs["base_url"] = base_url`
+   - Create `self._client = anthropic.AsyncAnthropic(**kwargs)`
+   - Return `self._client`
+3. Both `require_client()` and `require_skills_client()` call `_ensure_client()`, ensuring single instance
 
 ### Session Tracking
 
@@ -426,7 +440,7 @@ def test_client_identity(monkeypatch):
 ### Test Verification Strategy
 
 1. **Environment variable tests:** Use `monkeypatch` to set/unset keys and verify client behavior
-2. **Error handling test:** Confirm `MissingAPIKeyError` with correct message when key absent
+2. **Error handling test:** Confirm `MissingAPIKeyError` with correct message when key absent, raised from `require_*` methods not `__init__`
 3. **Base URL tests:** Verify SDK default vs. custom URL usage
 4. **Client identity test:** Confirm single instance returned by both methods
 5. **Tracing tests:** Verify `traceparent()` stability within a session and variance between sessions, covering both context-var path and explicit session id argument path
@@ -445,7 +459,7 @@ This section maps each test case to its corresponding acceptance criteria, ensur
 
 1. **`test_missing_api_key_raises_error`**
    - **Maps to:** AC3 (Missing API key raises clear error), AC8 scenario 1
-   - **Verifies:** `ANTHROPIC_API_KEY` unset → both `require_client()` and `require_skills_client()` raise `MissingAPIKeyError` with message `"ANTHROPIC_API_KEY is not set"`
+   - **Verifies:** `ANTHROPIC_API_KEY` unset → `ModelGateway()` does not raise; `require_client()` and `require_skills_client()` raise `MissingAPIKeyError` with message `"ANTHROPIC_API_KEY is not set"`
 
 2. **`test_default_base_url_when_not_set`**
    - **Maps to:** AC2 (client uses SDK default when `ANTHROPIC_BASE_URL` not set), AC8 scenario 2
@@ -518,6 +532,7 @@ This matches the breakdown's Verification Approach count and ensures all accepta
 
 - **Backward compatibility:** Method names `require_client()` and `require_skills_client()` preserved so callers in `src/agents/skills/client.py` and `src/agents/tools/bindings.py` require no changes
 - **Single client:** One `AsyncAnthropic` instance serves both model calls and skill uploads, simplifying the gateway
+- **Deferred initialization:** `__init__()` does not raise when `ANTHROPIC_API_KEY` is unset; the error is raised from `require_client()` and `require_skills_client()` as specified in AC3 and AC8
 - **Error messages:** `MissingAPIKeyError` message matches existing error handling patterns; callers catching this exception remain unchanged
 - **Tracing continuity:** `session_id`, `traceparent()`, and `trace_id()` functions preserved for `runtime/runner.py`, `queue/pool.py`, `queue/subtasks.py`; run results continue returning `trace_id`
 - **Documentation scope:** Changes limited to README.md sections directly affected by LiteLLM/Cloudflare removal; other documentation unchanged

@@ -1,15 +1,15 @@
 ---
 schema_version: 1
 key: PER-91
-status: changes_requested
-current_node: pr_review
+status: in_development
+current_node: dev
 track: standard
 involved_repos:
 - agent
 depends_on: []
 owner: regularinsaan
 lease_until: '2026-11-01T10:56:42.227609+00:00'
-revision: 52
+revision: 55
 hub_sha: null
 ticket_hash: 30f0e373f92f210f
 jira_hash: 30f0e373f92f210f
@@ -22,7 +22,7 @@ stories:
 child_ticket_keys: []
 critic_iterations: 0
 dev_retries: 0
-pr_revision_rounds: 1
+pr_revision_rounds: 2
 gate_rounds:
   plan: 1
 pr_ids:
@@ -30,10 +30,10 @@ pr_ids:
   hub: '4'
   hub_plan: '5'
   agent: '1'
-waiting_for: spec_revision
-tokens_in: 139582
-tokens_out: 35421
-cost_anthropic_usd: 0.928137
+waiting_for: null
+tokens_in: 181481
+tokens_out: 48350
+cost_anthropic_usd: 1.247769
 history:
 - node: intake
   note: snapshot written
@@ -192,6 +192,45 @@ history:
 - node: pr_review
   note: "major issue \u2192 delta spec gate (human) after minor/moderate auto-fix"
   at: '2026-10-30T11:10:46.934952+00:00'
+- node: pr_review
+  note: 'fix:agent:issue:moderate:Code fix, no spec change: ModelGateway() must not
+    raise in __init__ when ANTHROP'
+  at: '2026-11-02T05:25:24.962229+00:00'
+- node: pr_review
+  note: 'fix:agent:needs_human:moderate:**Potential bug: `trace_id(sid: str)` signature
+    is mandatory but `traceparent(si'
+  at: '2026-11-02T05:25:29.679273+00:00'
+- node: pr_review
+  note: "fix:agent:not_an_issue:None:**AC8 gap: missing test for 'no `cf-aig-authorization`\
+    \ header is sent'** \u2014 AC8 r"
+  at: '2026-11-02T05:25:33.477953+00:00'
+- node: pr_review
+  note: "fix:agent:needs_human:moderate:**AC7 clarification: 'Model calls go directly\
+    \ to the Anthropic API' \u2014 does this "
+  at: '2026-11-02T05:25:37.299918+00:00'
+- node: pr_review
+  note: 'fix:agent:not_an_issue:None:**AC6 violation: `LANGWATCH_DISABLED=false` should
+    be the default, but documenta'
+  at: '2026-11-02T05:25:41.123034+00:00'
+- node: pr_review
+  note: auto-fix tier=moderate round=2
+  at: '2026-11-02T05:25:44.806903+00:00'
+- node: pr_review
+  note: "route moderate \u2192 loop pr_fix_moderate: designer \u2192 test_architect\
+    \ \u2192 dev \u2192 pre_pr_qa \u2192 pr_review"
+  at: '2026-11-02T05:25:46.031424+00:00'
+- node: designer
+  note: lld updated
+  at: '2026-11-02T05:27:11.223702+00:00'
+- node: test_architect
+  note: tests appended
+  at: '2026-11-02T05:28:37.349744+00:00'
+- node: dev
+  note: starting
+  at: '2026-11-02T05:28:37.349843+00:00'
+- node: dev
+  note: done 01-agent
+  at: '2026-11-02T05:29:59.987208+00:00'
 ---
 
 # Feature state
