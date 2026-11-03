@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "key": "PER-101",
+  "source": "llm",
+  "summary": "Durable idempotency with Redis requires architect (data contract and store design), scrum_master (split into store, runner, worker and test stories), designer (file plan for each), test_architect (edge cases for concurrency and TTL), and critic (ensure contract consistency across specs).",
+  "track_hint": "standard",
+  "loop": "feature_with_architecture",
+  "delivery": "delivery",
+  "pr_fix": [
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "loops": [
+    "feature_with_architecture",
+    "delivery",
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "steps": [
+    {
+      "node": "analyst",
+      "activity": "requirements",
+      "why": "Extract the idempotency contract, store API, runner changes and worker changes into structured requirements for architecture review.",
+      "instructions": "",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "architect",
+      "activity": "hld",
+      "why": "Design the Redis key contract, claim/complete/release atomicity guarantees, error handling strategy and the two-store abstraction before implementation.",
+      "instructions": "",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "scrum_master",
+      "activity": "breakdown",
+      "why": "Split into separate stories for the store component, runner integration, worker status logic and tests so each can be implemented and reviewed independently.",
+      "instructions": "",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "designer",
+      "activity": "lld",
+      "why": "Each story needs a concrete file plan: the store module structure, where claim/complete/release calls go in runner.py, the conditional status write in orders.py, and test file organization.",
+      "instructions": "",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "test_architect",
+      "activity": "tests",
+      "why": "Pin edge cases as tests: concurrent claims, TTL expiry, Redis failure modes, resume path without claim, and the worker status write guard.",
+      "instructions": "",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "critic",
+      "activity": "consistency_check",
+      "why": "Cross-check that the HLD contract, breakdown stories, LLD file plans and test cases all agree on key format, claim semantics, TTL values and error handling.",
+      "instructions": "",
+      "auto": false,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "merge_pack",
+      "activity": "pack",
+      "why": "Pack per-ticket specs into merged_plan.md for review.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "architect_gate",
+      "activity": "review",
+      "why": "Human approval of specs and this plan before Dev.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "dev",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pre_pr_qa",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "open_pr",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pr_review",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "merge",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    }
+  ],
+  "skipped": [
+    {
+      "node": "tpm_gate",
+      "why": "Scope is clear from the ticket: durable idempotency with Redis, no product ambiguity or user-facing decision."
+    }
+  ],
+  "suggested_roles": [],
+  "suggested_loops": [],
+  "notes": [
+    "attempt 1: No loop: set `loop` to one loop id from the loop catalog"
+  ],
+  "created_at": "2026-11-03T09:16:23.862862+00:00",
+  "version": 1,
+  "trigger": "ticket",
+  "gate": null,
+  "feedback": [],
+  "feedback_errors": [],
+  "seen_feedback_ids": [],
+  "change_summary": "",
+  "changes": null,
+  "addressed": [],
+  "unresolved_questions": [],
+  "requires_review": true
+}
