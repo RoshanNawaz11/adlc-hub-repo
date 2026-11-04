@@ -12,7 +12,7 @@ Single-repo behavioral fix to add --threads=1 to lld on Linux CI; ticket states 
 
 ## Steps
 
-1. [ ] **analyst (inline_story)** — Convert the ticket into one implementable story with Given/When/Then AC and tech notes.
+1. [x] **analyst (inline_story)** — Convert the ticket into one implementable story with Given/When/Then AC and tech notes.
    - focus: Focus on the conditional logic (Linux + CI=true → add --threads=1) and the test cases in test/misc.jl. Emphasize that CI must be read at call time, not build time.
 2. [ ] **architect_gate (review)** _(auto)_ — Human approval of specs and this plan before Dev.
 3. [ ] **dev** _(auto)_ — Loop delivery.
