@@ -1,15 +1,15 @@
 ---
 schema_version: 1
 key: PER-116
-status: in_development
-current_node: dev
+status: pr_reviewed
+current_node: pr_review
 track: quick
 involved_repos:
 - app
 depends_on: []
 owner: regularinsaan
 lease_until: '2026-11-06T22:15:30.334306+00:00'
-revision: 53
+revision: 57
 hub_sha: null
 ticket_hash: 051db7c90ea9c276
 jira_hash: 051db7c90ea9c276
@@ -28,10 +28,11 @@ pr_ids:
   hub_plan: '9'
   hub_arch: '10'
   hub: '10'
-waiting_for: null
-tokens_in: 26779
-tokens_out: 4477
-cost_anthropic_usd: 0.147136
+  app: '2'
+waiting_for: feature_pr_human
+tokens_in: 31275
+tokens_out: 4484
+cost_anthropic_usd: 0.160729
 history:
 - node: intake
   note: snapshot written
@@ -76,6 +77,21 @@ history:
 - node: dev
   note: done 01-app
   at: '2026-11-04T22:19:51.582138+00:00'
+- node: pre_pr_qa
+  note: report written
+  at: '2026-11-04T22:20:06.713935+00:00'
+- node: open_pr
+  note: push app ok
+  at: '2026-11-04T22:20:22.703668+00:00'
+- node: open_pr
+  note: PRs opened app:2
+  at: '2026-11-04T22:20:22.703691+00:00'
+- node: pr_review
+  note: diff loaded app chars=2652
+  at: '2026-11-04T22:20:23.879686+00:00'
+- node: pr_review
+  note: awaiting feature_pr_human
+  at: '2026-11-04T22:20:28.443877+00:00'
 ---
 
 # Feature state

@@ -14,10 +14,10 @@ Single-repo behavioral fix to add --threads=1 to lld on Linux CI; ticket states 
 
 1. [x] **analyst (inline_story)** — Convert the ticket into one implementable story with Given/When/Then AC and tech notes.
    - focus: Focus on the conditional logic (Linux + CI=true → add --threads=1) and the test cases in test/misc.jl. Emphasize that CI must be read at call time, not build time.
-2. [ ] **architect_gate (review)** _(auto)_ — Human approval of specs and this plan before Dev.
-3. [ ] **dev** _(auto)_ — Loop delivery.
-4. [ ] **pre_pr_qa** _(auto)_ — Loop delivery.
-5. [ ] **open_pr** _(auto)_ — Loop delivery.
+2. [x] **architect_gate (review)** _(auto)_ — Human approval of specs and this plan before Dev.
+3. [x] **dev** _(auto)_ — Loop delivery.
+4. [x] **pre_pr_qa** _(auto)_ — Loop delivery.
+5. [x] **open_pr** _(auto)_ — Loop delivery.
 6. [ ] **pr_review** _(auto)_ — Loop delivery.
 7. [ ] **merge** _(auto)_ — Loop delivery.
 
