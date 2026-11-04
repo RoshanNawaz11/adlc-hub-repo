@@ -1,0 +1,1 @@
+{"story": "01-app", "repo": "app", "attempt": 3, "ok": false, "at": "2026-11-04T19:47:18+00:00", "checks": [{"name": "lint", "cmd": "make check-whitespace", "exit": 2, "summary": "make: *** [Makefile:183: check-whitespace] Error 127"}]}

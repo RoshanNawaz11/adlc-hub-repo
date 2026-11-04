@@ -20,3 +20,12 @@
 2026-11-04T19:23:15.395868+00:00 heartbeat architect_gate
 2026-11-04T19:23:15.407390+00:00 node start architect_gate
 2026-11-04T19:23:40.080209+00:00 node end architect_gate waiting=architect_review
+2026-11-04T19:31:42.837585+00:00 heartbeat dev
+2026-11-04T19:31:42.846232+00:00 node start dev
+2026-11-04T19:31:47.394945+00:00 dev cursor 01-app attempt=1
+2026-11-04T19:39:38.529556+00:00 dev verify 01-app FAIL attempt=1
+2026-11-04T19:39:39.120334+00:00 dev cursor 01-app attempt=2
+2026-11-04T19:42:31.045092+00:00 dev verify 01-app FAIL attempt=2
+2026-11-04T19:42:31.983113+00:00 dev cursor 01-app attempt=3
+2026-11-04T19:47:18.253365+00:00 dev verify 01-app FAIL attempt=3
+2026-11-04T19:47:18.876421+00:00 node end dev waiting=dev_failure

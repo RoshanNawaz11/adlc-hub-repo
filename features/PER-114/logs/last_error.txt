@@ -1,0 +1,29 @@
+lint failed
+$ make check-whitespace
+
+/bin/sh: 1: julia: not found
+make: *** [Makefile:183: check-whitespace] Error 127
+
+(exit 2)
+
+`sincospi(missing)` now returns `(missing, missing)`, so destructuring works the same way it does for `sincos(missing)` and `sincosd(missing)`.
+
+`base/math.jl` no longer generates the `sincospi(::Missing)` method from the shared list that returns a single `missing`. The generic `Real` fallback stays, and the missing case is explicit:
+
+```1334:1342:base/math.jl
+# `sincospi` returns a `(sine, cosine)` tuple, so `missing` must keep that shape
+# (same contract as `sincos` and `sincosd`). The generic `Real` fallback stays,
+# matching the loop above, so non-`Missing` numeric results are unchanged.
+function sincospi(x::Real)
+    xf = float(x)
+    xf isa typeof(x) && throw(MethodError(sincospi, (x,)))
+    return sincospi(xf)
+end
+sincospi(::Missing) = (missing, missing)
+```
+
+`test/math.jl` checks that the result is `(missing, missing)` and that `s, c = sincospi(missing)` succeeds with both values `missing`.
+
+`julia --startup-file=no contrib/check-whitespace.jl` passed. `julia --startup-file=no test/runtests.jl math` stops immediately: this Julia 1.13.3 has no `Distributed.worker_output_hook`, which `test/runtests.jl` expects. That harness was left as-is. The installed image still has the old `sincospi(::Missing) = missing` method, so these source changes are not in the binary until Julia is rebuilt.
+
+Files for this story: `base/math.jl`, `test/math.jl`. `.gitignore` was already modified and is not part of the story.
