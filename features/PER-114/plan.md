@@ -12,7 +12,7 @@ Single-file bug fix in base/math.jl to return (missing, missing) from sincospi(m
 
 ## Steps
 
-1. [ ] **analyst (inline_story)** — Convert the ticket into an implementable story with Given/When/Then and technical notes.
+1. [x] **analyst (inline_story)** — Convert the ticket into an implementable story with Given/When/Then and technical notes.
    - focus: The ticket already has clear scope and acceptance criteria. Focus on the file location (base/math.jl around line 1325), the specific method to change (sincospi(::Missing)), and the test file (test/math.jl). Emphasize that other Missing methods stay unchanged.
 2. [ ] **architect_gate (review)** _(auto)_ — Human approval of specs and this plan before Dev.
 3. [ ] **dev** _(auto)_ — Loop delivery.
