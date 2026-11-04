@@ -50,3 +50,17 @@ sincospi(::Missing) = (missing, missing)
 `julia --startup-file=no contrib/check-whitespace.jl` passed. `julia --startup-file=no test/runtests.jl math` stops immediately: this Julia 1.13.3 has no `Distributed.worker_output_hook`, which `test/runtests.jl` expects. That harness was left as-is. The installed image still has the old `sincospi(::Missing) = missing` method, so these source changes are not in the binary until Julia is rebuilt.
 
 Files for this story: `base/math.jl`, `test/math.jl`. `.gitignore` was already modified and is not part of the story.
+`sincospi(missing)` now returns `(missing, missing)`, so `s, c = sincospi(missing)` succeeds. Single-value `Missing` methods and numeric `sincospi` results are unchanged.
+
+**`base/math.jl`**
+- Removed `:sincospi` from the shared list that generates `f(::Missing) = missing`.
+- Added `sincospi(::Missing) = (missing, missing)`.
+- Kept the `Real` promotion method that the list used to generate, so values such as `Rational` still go through `float`.
+
+**`test/math.jl`**
+- Added a regression test that `sincospi(missing) === (missing, missing)` and that destructuring yields two `missing` values.
+
+**Checks**
+- `julia --startup-file=no contrib/check-whitespace.jl` passed.
+- `julia --startup-file=no test/runtests.jl math` exited immediately: this tree has no built `usr/bin/julia`, and the installed Julia 1.13.3 fails in `test/runtests.jl` before any math test starts (`Distributed.worker_output_hook` is not defined). The harness was not changed.
+- On that same Julia, defining the new method shows `sincospi(missing)` is `(missing, missing)`, `sincos` / `sincosd` stay pairs, and `sinpi` / `cospi` / `tanpi` still return a single `missing`.

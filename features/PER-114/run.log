@@ -29,3 +29,8 @@
 2026-11-04T19:42:31.983113+00:00 dev cursor 01-app attempt=3
 2026-11-04T19:47:18.253365+00:00 dev verify 01-app FAIL attempt=3
 2026-11-04T19:47:18.876421+00:00 node end dev waiting=dev_failure
+2026-11-04T20:25:11.664101+00:00 heartbeat dev
+2026-11-04T20:25:11.670829+00:00 node start dev
+2026-11-04T20:25:14.703906+00:00 dev cursor 01-app attempt=1
+2026-11-04T20:29:24.749436+00:00 warning: no test command configured for app; verification skipped
+2026-11-04T20:29:24.781640+00:00 dev verify 01-app PASS attempt=1

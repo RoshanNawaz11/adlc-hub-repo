@@ -1,7 +1,7 @@
 ---
 schema_version: 1
 key: PER-114
-status: escalated
+status: in_development
 current_node: dev
 track: quick
 involved_repos:
@@ -9,7 +9,7 @@ involved_repos:
 depends_on: []
 owner: regularinsaan
 lease_until: '2026-11-06T19:31:41.770264+00:00'
-revision: 60
+revision: 66
 hub_sha: null
 ticket_hash: a4e6eb297ce46101
 jira_hash: a4e6eb297ce46101
@@ -28,7 +28,7 @@ pr_ids:
   hub_plan: '7'
   hub_arch: '8'
   hub: '8'
-waiting_for: dev_failure
+waiting_for: null
 tokens_in: 29913
 tokens_out: 3376
 cost_anthropic_usd: 0.139691
@@ -89,6 +89,18 @@ history:
 - node: dev
   note: 'failed 01-app: lint failed'
   at: '2026-11-04T19:47:18.849943+00:00'
+- node: catch_up
+  note: manual commit 84ec72f4133a6e61005dd5ae9a10241ac9dfd66a
+  at: '2026-11-04T20:25:10.432023+00:00'
+- node: dev
+  note: starting
+  at: '2026-11-04T20:25:11.680012+00:00'
+- node: dev
+  note: 'not checked before PR, commands empty in project.yaml: repos.app.commands.test'
+  at: '2026-11-04T20:25:11.680031+00:00'
+- node: dev
+  note: done 01-app
+  at: '2026-11-04T20:29:26.618750+00:00'
 ---
 
 # Feature state

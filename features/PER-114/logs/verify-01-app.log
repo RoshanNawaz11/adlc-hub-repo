@@ -22,3 +22,11 @@ make: *** [Makefile:183: check-whitespace] Error 127
 
 (exit 2)
 
+===== 2026-11-04T20:29:24+00:00 attempt 1: PASS =====
+$ PATH="$HOME/.juliaup/bin:$PATH" make check-whitespace
+
+Whitespace check found no issues.
+
+(exit 0)
+no test command configured; verification skipped
+
