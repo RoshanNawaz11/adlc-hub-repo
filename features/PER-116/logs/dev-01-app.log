@@ -1,0 +1,7 @@
+`Base.Linking.ld()` now passes `--threads=1` to lld on Linux when `CI` is `"true"` at call time, so image links on old-glibc CI hosts do not use LLD's parallel linker.
+
+**`base/linking.jl`** — In the non-Windows, non-Apple branch of `ld()`, the flag is appended only when `Sys.islinux()` is true and `get(ENV, "CI", "") == "true"`. That read happens inside the function, so it is not fixed in the system image. Every other argument, including `-z defs`, is unchanged for both `strict_definitions` values. macOS and Windows never take this branch.
+
+**`test/misc.jl`** — On Linux, the new test checks `Base.Linking.ld().exec` for `CI` set to `"true"`, unset, and `"false"`, with `strict_definitions` both `false` and `true`. Other platforms make no assertions.
+
+`make check-whitespace` passed. `make test-revise-misc` did not run: this worktree has no `usr/bin/julia`.

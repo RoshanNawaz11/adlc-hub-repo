@@ -1,20 +1,20 @@
 ---
 schema_version: 1
 key: PER-116
-status: waiting_architect_review
-current_node: architect_gate
+status: in_development
+current_node: dev
 track: quick
 involved_repos:
 - app
 depends_on: []
 owner: regularinsaan
-lease_until: '2026-11-06T21:54:20.581529+00:00'
-revision: 33
+lease_until: '2026-11-06T22:15:30.334306+00:00'
+revision: 53
 hub_sha: null
 ticket_hash: 051db7c90ea9c276
 jira_hash: 051db7c90ea9c276
-tpm_approved: false
-specs_locked: false
+tpm_approved: true
+specs_locked: true
 skills_lock:
   bmad: 1cbcfa272fe65787c06a1fa164a901f46117cca7
 stories:
@@ -28,7 +28,7 @@ pr_ids:
   hub_plan: '9'
   hub_arch: '10'
   hub: '10'
-waiting_for: architect_review
+waiting_for: null
 tokens_in: 26779
 tokens_out: 4477
 cost_anthropic_usd: 0.147136
@@ -61,6 +61,21 @@ history:
 - node: architect_gate
   note: awaiting human hub PR approval
   at: '2026-11-04T21:56:35.864430+00:00'
+- node: architect_gate
+  note: approved via hub PR (reconcile)
+  at: '2026-11-04T22:15:30.286603+00:00'
+- node: architect_gate
+  note: "forge unlocked architect_review \u2192 resume"
+  at: '2026-11-04T22:15:30.334325+00:00'
+- node: dev
+  note: starting
+  at: '2026-11-04T22:15:31.613396+00:00'
+- node: dev
+  note: 'not checked before PR, commands empty in project.yaml: repos.app.commands.test'
+  at: '2026-11-04T22:15:31.613430+00:00'
+- node: dev
+  note: done 01-app
+  at: '2026-11-04T22:19:51.582138+00:00'
 ---
 
 # Feature state

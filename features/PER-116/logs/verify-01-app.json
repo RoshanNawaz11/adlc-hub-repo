@@ -1,0 +1,1 @@
+{"story": "01-app", "repo": "app", "attempt": 1, "ok": true, "at": "2026-11-04T22:19:50+00:00", "checks": [{"name": "lint", "cmd": "PATH=\"$HOME/.juliaup/bin:$PATH\" make check-whitespace", "exit": 0, "summary": "Whitespace check found no issues."}, {"name": "test", "cmd": "", "exit": null, "summary": "no command set"}]}
