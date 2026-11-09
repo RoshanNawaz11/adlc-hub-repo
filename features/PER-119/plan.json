@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "key": "PER-119",
+  "source": "llm",
+  "summary": "Performance optimization and observability improvement in a single repo with clear requirements and multiple design concerns (state schema, routing logic, usage tracking); feature_with_architecture fits to ensure the state changes, orchestrator logic and usage aggregation all agree before coding.",
+  "track_hint": "standard",
+  "loop": "feature_with_architecture",
+  "delivery": "delivery",
+  "pr_fix": [
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "loops": [
+    "feature_with_architecture",
+    "delivery",
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "steps": [
+    {
+      "node": "analyst",
+      "activity": "requirements",
+      "why": "Extract the three distinct requirements (forced routing, usage tracking, state changes) from the detailed ticket.",
+      "instructions": "Focus on the three main requirements: forced_route logic, usage aggregation per node, and orchestrator skip conditions. Keep the acceptance criteria concrete.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "architect",
+      "activity": "hld",
+      "why": "State schema changes, routing component design, and usage tracking across multiple call sites need architectural agreement before implementation.",
+      "instructions": "Design the state.usage schema with its reducer, the forced_route algorithm that delegates to broken_rules, and how usage flows from run_skill/bindings/ModelGateway through node updates to state. Address backward compatibility for runs saved before this change.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "scrum_master",
+      "activity": "breakdown",
+      "why": "Work spans route_rules.py, node.py, state schema, bindings.py, ModelGateway, and runner.py; breakdown into implementable slices needed.",
+      "instructions": "Break down by component: (1) state.usage schema and reducer, (2) forced_route in route_rules.py, (3) orchestrator skip logic in node.py, (4) usage collection in run_skill/bindings/ModelGateway, (5) logging and API changes in runner.py.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "designer",
+      "activity": "lld",
+      "why": "Each story needs concrete file plans for state changes, the forced_route algorithm, usage propagation, and test setup with fake gateway.",
+      "instructions": "Provide detailed file plans showing exactly where usage gets collected (run_skill, bindings tool loop, ModelGateway), how the reducer merges counts, and how forced_route delegates to broken_rules without duplicating rules.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "test_architect",
+      "activity": "tests",
+      "why": "Acceptance criteria include specific test cases for forced_route behavior, orchestrator skip conditions, usage aggregation, and backward compatibility.",
+      "instructions": "Map each AC to tests: forced_route cases, orchestrator model call skip, forced hop step format, usage accumulation across retries and tool rounds, backward compatibility for runs without usage.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "merge_pack",
+      "activity": "pack",
+      "why": "Loop feature_with_architecture: Deterministic merged_plan.md from ordered specs and story summaries.",
+      "instructions": "",
+      "auto": true,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "critic",
+      "activity": "consistency_check",
+      "why": "Multiple artifacts (requirements, HLD, breakdown, stories, tests) must agree on state schema, forced_route contract, and usage flow.",
+      "instructions": "Verify consistency across all specs: state.usage schema matches in HLD and stories, forced_route algorithm agrees with broken_rules delegation, usage collection points match across HLD and implementation stories.",
+      "auto": false,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "architect_gate",
+      "activity": "review",
+      "why": "Human approval of specs and this plan before Dev.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "dev",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pre_pr_qa",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "open_pr",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pr_review",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "merge",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    }
+  ],
+  "skipped": [
+    {
+      "node": "tpm_gate",
+      "why": "Technical performance optimization with clear requirements in ticket; no product scope ambiguity or user-facing changes needing product sign-off."
+    }
+  ],
+  "suggested_roles": [],
+  "suggested_loops": [],
+  "notes": [],
+  "created_at": "2026-11-09T09:47:45.784019+00:00",
+  "version": 1,
+  "trigger": "ticket",
+  "gate": null,
+  "feedback": [],
+  "feedback_errors": [],
+  "seen_feedback_ids": [],
+  "change_summary": "",
+  "changes": null,
+  "addressed": [],
+  "unresolved_questions": [],
+  "requires_review": true
+}

@@ -12,17 +12,17 @@ Performance optimization and observability improvement in a single repo with cle
 
 ## Steps
 
-1. [ ] **analyst (requirements)** — Extract the three distinct requirements (forced routing, usage tracking, state changes) from the detailed ticket.
+1. [x] **analyst (requirements)** — Extract the three distinct requirements (forced routing, usage tracking, state changes) from the detailed ticket.
    - focus: Focus on the three main requirements: forced_route logic, usage aggregation per node, and orchestrator skip conditions. Keep the acceptance criteria concrete.
-2. [ ] **architect (hld)** — State schema changes, routing component design, and usage tracking across multiple call sites need architectural agreement before implementation.
+2. [x] **architect (hld)** — State schema changes, routing component design, and usage tracking across multiple call sites need architectural agreement before implementation.
    - focus: Design the state.usage schema with its reducer, the forced_route algorithm that delegates to broken_rules, and how usage flows from run_skill/bindings/ModelGateway through node updates to state. Address backward compatibility for runs saved before this change.
-3. [ ] **scrum_master (breakdown)** — Work spans route_rules.py, node.py, state schema, bindings.py, ModelGateway, and runner.py; breakdown into implementable slices needed.
+3. [x] **scrum_master (breakdown)** — Work spans route_rules.py, node.py, state schema, bindings.py, ModelGateway, and runner.py; breakdown into implementable slices needed.
    - focus: Break down by component: (1) state.usage schema and reducer, (2) forced_route in route_rules.py, (3) orchestrator skip logic in node.py, (4) usage collection in run_skill/bindings/ModelGateway, (5) logging and API changes in runner.py.
-4. [ ] **designer (lld)** — Each story needs concrete file plans for state changes, the forced_route algorithm, usage propagation, and test setup with fake gateway.
+4. [x] **designer (lld)** — Each story needs concrete file plans for state changes, the forced_route algorithm, usage propagation, and test setup with fake gateway.
    - focus: Provide detailed file plans showing exactly where usage gets collected (run_skill, bindings tool loop, ModelGateway), how the reducer merges counts, and how forced_route delegates to broken_rules without duplicating rules.
-5. [ ] **test_architect (tests)** — Acceptance criteria include specific test cases for forced_route behavior, orchestrator skip conditions, usage aggregation, and backward compatibility.
+5. [x] **test_architect (tests)** — Acceptance criteria include specific test cases for forced_route behavior, orchestrator skip conditions, usage aggregation, and backward compatibility.
    - focus: Map each AC to tests: forced_route cases, orchestrator model call skip, forced hop step format, usage accumulation across retries and tool rounds, backward compatibility for runs without usage.
-6. [ ] **merge_pack (pack)** _(auto)_ — Loop feature_with_architecture: Deterministic merged_plan.md from ordered specs and story summaries.
+6. [x] **merge_pack (pack)** _(auto)_ — Loop feature_with_architecture: Deterministic merged_plan.md from ordered specs and story summaries.
 7. [ ] **critic (consistency_check)** — Multiple artifacts (requirements, HLD, breakdown, stories, tests) must agree on state schema, forced_route contract, and usage flow.
    - focus: Verify consistency across all specs: state.usage schema matches in HLD and stories, forced_route algorithm agrees with broken_rules delegation, usage collection points match across HLD and implementation stories.
 8. [ ] **architect_gate (review)** _(auto)_ — Human approval of specs and this plan before Dev.
