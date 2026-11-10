@@ -23,10 +23,10 @@ Added critic step to cross-check consistency between the story, LLD, and test pl
 
 ## Steps
 
-1. [ ] **analyst (inline_story)** — The ticket gives clear scope and acceptance criteria; the analyst writes one implementable story.
-2. [ ] **designer (lld)** — The work touches several files: the parser for rule YAML, the catalogue builder, the CLI command, the markdown writer, and tests; a file-by-file plan is needed.
-3. [ ] **test_architect (tests)** — The acceptance criteria list specific test scenarios (flags in cases/checks/lines, flags list, agent/row order, broken files, --check modes) that map 1:1 to test cases.
-4. [ ] **critic (consistency_check)** — Cross-check consistency between the inline story, the LLD, and the test plan.
+1. [x] **analyst (inline_story)** — The ticket gives clear scope and acceptance criteria; the analyst writes one implementable story.
+2. [x] **designer (lld)** — The work touches several files: the parser for rule YAML, the catalogue builder, the CLI command, the markdown writer, and tests; a file-by-file plan is needed.
+3. [x] **test_architect (tests)** — The acceptance criteria list specific test scenarios (flags in cases/checks/lines, flags list, agent/row order, broken files, --check modes) that map 1:1 to test cases.
+4. [x] **critic (consistency_check)** — Cross-check consistency between the inline story, the LLD, and the test plan.
 5. [ ] **architect_gate (review)** _(auto)_ _(rerun)_ — Human approval of specs and this plan before Dev.
 6. [ ] **dev** _(auto)_ — Loop delivery.
 7. [ ] **pre_pr_qa** _(auto)_ — Loop delivery.
