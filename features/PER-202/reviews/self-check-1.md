@@ -1,0 +1,35 @@
+## What would go wrong
+
+### C1
+- file: stories/02-agent.md
+- section: ## Tests
+- quote: Test 9: Integration test — Claim, release, claim again by another reviewer
+- match: breakdown.md › Story 2 › Verification Approach
+- problem: The breakdown lists 10 verification tests for Story 2, but the LLD only implements 8 tests (Tests 1-8). Test 9 starts but is cut off mid-implementation with `async def test_claim_release_claim_history(monkeypatch):` followed by incomplete code ending with `response_resume = await client.post(`. Test 10 is completely missing. A developer following this LLD would deliver 8 tests when the breakdown promised 10.
+- change: Complete Test 9 with the full implementation (claim → release → claim by another reviewer, verify history has all three events), and add Test 10 (claim → handover with reason, verify history shows handover event with reason).
+
+### C2
+- file: stories/03-agent.md
+- section: ## Interfaces
+- quote: async for thread_state in checkpointer.alist(None):
+- match: stories/05-agent.md › ## Interfaces › async for thread_state in checkpointer.alist(None):
+- problem: Both Story 3 and Story 5 use the same checkpointer scanning pattern (`async for thread_state in checkpointer.alist(None)`), but neither verifies that this API actually exists in the repo's LangGraph version. The HLD notes "verified in LangGraph 0.2.x docs" but the repo context does not show the LangGraph version or confirm `alist(None)` works. If the checkpointer requires a config argument (not `None`), both stories would build the wrong query and the endpoints would return empty lists.
+- change: Add a note in both Story 3 and Story 5 LLD Algorithm Notes sections: "Verify that `checkpointer.alist(None)` works in the repo's LangGraph version by checking `repo-file/agent/pyproject.toml` for the `langgraph` dependency version. If `alist(None)` is not supported, use the sqlite fallback documented in Risks section." This tells Dev to check before building, not after.
+
+### C3
+- file: stories/04-agent.md
+- section: ## Interfaces
+- quote: class ReviewDecision(BaseModel):\n    """The reviewer's approval or rejection of the whole run (graph.states.Review)."""\n    action: Literal["approve", "reject"]\n    reason: str | None = None\n    reviewer_id: str  # NEW: the reviewer performing the action
+- match: hld.md › ## Components › 3. API Contracts › 3.1. Claim a case
+- problem: Story 4 adds `reviewer_id` as a required field to `ReviewDecision` and `FlagAnswers`, making it mandatory for all resume requests. The HLD's claim endpoint examples (section 3.1-3.3) do not show `reviewer_id` in the resume flow at all—they only show it in claim/release/handover. The HLD's ownership check section (5. Authorization Check) says "endpoints that modify a case... check `state["claim"]["reviewer_id"]` against the request's `reviewer_id`" but does not explicitly say the resume endpoint takes `reviewer_id` in its body. Dev would add the field per Story 4, but a reviewer checking against the HLD would not see where `reviewer_id` comes from in the resume request.
+- change: Update the HLD section "5. Authorization Check" to explicitly show that `POST /runs/{thread_id}/resume` will accept `reviewer_id` in the request body (in both `FlagAnswers` and `ReviewDecision` models), and add it to the "Existing endpoints to modify" bullet point with an example request body: `{"reviewer_id": "alice", "action": "approve"}`.
+
+### C4
+- file: stories/06-agent.md
+- section: ## Tests
+- quote: # entry 2: alice's handover (carries alice's ID, not bob's, because it's alice's action)\n    assert claim_history[1]["reviewer_id"] == "alice"\n    assert claim_history[1]["reason"] == "Waiting on client for bonus details"
+- match: stories/02-agent.md › ## Algorithm Notes › Claim History Format
+- problem: Story 6 Test 1 expects the handover history entry to carry Alice's reviewer ID (`claim_history[1]["reviewer_id"] == "alice"`) because "it's alice's action." But Story 2's handover endpoint implementation (`stories/02-agent.md › ## Interfaces › 2.3. Hand over a claim`) builds the handover event as `{"reviewer_id": req.from_reviewer, "claimed_at": now, "reason": req.reason}`, which is correct. However, the test then says "the handover event's timestamp is when alice handed it over (not bob's claim timestamp)" but the code in Story 2 sets `claimed_at = now` for *both* the handover event *and* the new claim, meaning they have the same timestamp. Dev following Story 2 would set both to `now`, and the test would pass the assertion but the comment would be misleading.
+- change: In Story 6 Test 1, clarify the comment: "the handover event's `claimed_at` and the new claim's `claimed_at` are both set to the handover time (`now` when the handover request is processed), so they will have the same or nearly the same timestamp."
+
+VERDICT: FAIL

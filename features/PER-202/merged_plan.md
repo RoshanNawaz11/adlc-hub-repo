@@ -1,0 +1,281 @@
+# Merged plan — PER-202
+
+Execution order (6 ticket(s)):
+
+1. `PER-203` (story `01-agent`)
+2. `PER-204` (story `02-agent`)
+3. `PER-205` (story `03-agent`)
+4. `PER-206` (story `04-agent`)
+5. `PER-207` (story `05-agent`)
+6. `PER-208` (story `06-agent`)
+
+Specs (1): `specs/1.md`
+
+---
+
+## Spec `specs/1.md`
+
+# Tech Stub — PER-202
+
+**Feature:** Reviewers can claim, hand over and track their cases  
+**Story:** Case claim and handover workflow with reviewer queues and lead monitoring  
+**Source:** Requirements, HLD, and repo context
+
+---
+
+## Stack
+
+**Language:** Python 3.11+  
+**Framework:** FastAPI (existing HTTP server: `src/agents/runtime/server.py`)  
+**State persistence:** LangGraph state with checkpointer (Redis or SQLite; `src/agents/runtime/checkpointer.py`)  
+**Async runtime:** `asyncio` + `uvicorn`  
+**Validation:** Pydantic models  
+**Testing:** `pytest` + `pytest-asyncio`
+
+The repo already uses:
+- **LangGraph** (`langgraph.graph`, `langgraph.checkpoint.base.BaseCheckpointSaver`) for state machines and checkpointing
+- **FastAPI** (`fastapi.FastAPI`, `pydantic.BaseModel`) for HTTP endpoints
+- **Redis** (via `arq` queues, `src/agents/queue/orders.py`) for background jobs and status tracking
+- **SQLite** (`aiosqlite`, `langgraph.checkpoint.sqlite.aio.AsyncSqliteSaver`) as the default checkpointer backend
+
+All claim state lives in the existing `State` TypedDict (`src/agents/graph/states.py`) and persists via the checkpointer.
+
+---
+
+## Schema & API Contracts
+
+### 1. State Schema Extensions
+
+**File:** `src/agents/graph/states.py`
+
+Add two new fields to the `State` TypedDict:
+
+```python
+class Claim(TypedDict):
+    reviewer_id: str
+    claimed_at: str  # ISO 8601 UTC timestamp
+    reason: NotRequired[str]  # populated on handover only
+
+class State(TypedDict):
+    # ... existing fields ...
+    claim: NotRequired[Claim | None]
+    claim_history: NotRequired[list[Claim]]
+    needs_review_since: NotRequired[str]  # ISO 8601 UTC timestamp when status became "needs_review"
+```
+
+- **`claim`**: current claim (reviewer ID, timestamp, optional handover reason), or `None` when unclaimed
+- **`claim_history`**: append-only log of every claim, release, and handover
+- **`needs_review_since`**: timestamp when the case entered `status: "needs_review"`; set by orchestrator, used to compute waiting duration for lead monitoring
+
+### 2. API Endpoints
+
+**File:** `src/agents/runtime/server.py`
+
+#### 2.1. Claim a case
+
+```
+POST /runs/{thread_id}/claim
+Request: {"reviewer_id": "<id>"}
+Response:
+  200 {"status": "claimed", "claim": {"reviewer_id": "<id>", "claimed_at": "<timestamp>"}}
+  409 {"error": "already_claimed", "claim": {"reviewer_id": "<other>", "claimed_at": "<when>"}}
+  400 {"error": "not_claimable", "reason": "case is <status>"}
+```
+
+**Logic:**
+1. Load snapshot via `_snapshot(thread_id)`
+2. Validate `state["status"] == "needs_review"` (else 400)
+3. If `state.get("claim")` exists, return 409 with current claim
+4. Update state: `{"claim": {"reviewer_id": <id>, "claimed_at": <now>}, "claim_history": [...history, same_claim]}`
+5. Persist checkpoint and return 200
+
+#### 2.2. Release a claim
+
+```
+POST /runs/{thread_id}/release
+Request: {"reviewer_id": "<id>"}
+Response:
+  200 {"status": "released"}
+  403 {"error": "not_owner", "claim": {"reviewer_id": "<other>", ...}}
+  400 {"error": "not_claimed"}
+```
+
+**Logic:**
+1. Load snapshot
+2. If no claim, return 400
+3. If `claim["reviewer_id"] != <id>`, return 403
+4. Update state: `{"claim": None, "claim_history": [...history, {"reviewer_id": <id>, "claimed_at": <now>, "reason": "released"}]}`
+5. Persist and return 200
+
+#### 2.3. Hand over a claim
+
+```
+POST /runs/{thread_id}/handover
+Request: {"from_reviewer": "<id>", "to_reviewer": "<other_id>", "reason": "<text>"}
+Response:
+  200 {"status": "handed_over", "claim": {"reviewer_id": "<other_id>", "claimed_at": "<timestamp>"}}
+  403 {"error": "not_owner", ...}
+  400 {"error": "reason_required"}
+```
+
+**Logic:**
+1. Load snapshot
+2. Validate `state["claim"]["reviewer_id"] == from_reviewer` (else 403)
+3. Validate `reason` is non-empty (else 400)
+4. Update state: `{"claim": {"reviewer_id": to_reviewer, "claimed_at": <now>}, "claim_history": [...history, {"reviewer_id": from_reviewer, "claimed_at": <now>, "reason": <reason>}]}`
+5. Persist and return 200
+
+#### 2.4. Reviewer's queue
+
+```
+GET /reviewers/{reviewer_id}/queue
+Response: 200 {"cases": [{"thread_id": "<id>", "employee": "<name>", "case_type": "<type>", "waiting_seconds": <int>}, ...]}
+```
+
+**Logic:**
+1. Query all threads with `status: "needs_review"` and `claim.reviewer_id == <id>` from checkpointer
+2. For each, compute `waiting_seconds = now - claim.claimed_at`
+3. Sort by `waiting_seconds` descending (oldest first)
+4. Return list with `employee` from `state["service_order"]["employee"]`, `case_type` from `state["service_order"]["caseType"]`
+
+**Data source:** Checkpointer indexes threads by namespace; this query scans `status` and `claim` fields.
+
+#### 2.5. Lead's waiting list
+
+```
+GET /leads/waiting
+Query: ?threshold_hours=4
+Response: 200 {"cases": [{"thread_id": "<id>", "employee": "<name>", "case_type": "<type>", "waiting_seconds": <int>}, ...]}
+```
+
+**Logic:**
+1. Load `threshold_hours` (default 4, from query param or env var `CLAIM_WAITING_THRESHOLD_HOURS`)
+2. Query all threads with `status: "needs_review"` and `claim == None`
+3. For each, compute `waiting_seconds = now - needs_review_since`
+4. Filter where `waiting_seconds > threshold_hours * 3600`
+5. Sort by `waiting_seconds` descending (longest first)
+6. Return list
+
+---
+
+## File Touch List
+
+### Modified Files
+
+| File | Change |
+|------|--------|
+| `src/agents/graph/states.py` | Add `Claim` TypedDict, `claim`, `claim_history`, and `needs_review_since` fields to `State` |
+| `src/agents/runtime/server.py` | Add 5 new endpoints: `/claim`, `/release`, `/handover`, `/reviewers/{id}/queue`, `/leads/waiting`; add `_require_owner()` middleware; add `_waiting_threshold_seconds()` config reader |
+| `src/agents/graph/edges.py` | Set `needs_review_since` when transitioning to `needs_review` status (or in orchestrator node if that's where the transition happens) |
+
+### New Files
+
+None — all changes extend existing modules.
+
+---
+
+## Implementation Notes
+
+### Claim State Transitions
+
+- **Unclaimed → Claimed:** POST `/runs/{thread_id}/claim` → `state["claim"] = {"reviewer_id": <id>, "claimed_at": <timestamp>}`, append to `claim_history`
+- **Claimed → Released:** POST `/runs/{thread_id}/release` → `state["claim"] = None`, append release event to `claim_history` with `reason: "released"`
+- **Claimed by A → Claimed by B:** POST `/runs/{thread_id}/handover` → `state["claim"] = {"reviewer_id": B, "claimed_at": <timestamp>}`, append handover event to `claim_history` with A's ID and the reason
+
+### Ownership Check
+
+**Function:** `_require_owner(state: dict, reviewer_id: str) -> tuple[bool, dict | None]`
+
+**Logic:**
+```python
+def _require_owner(state: dict, reviewer_id: str) -> tuple[bool, dict | None]:
+    claim = state.get("claim")
+    if claim and claim["reviewer_id"] != reviewer_id:
+        return False, {"error": "not_owner", "claim": claim}
+    return True, None
+```
+
+**Applied to:**
+- POST `/runs/{thread_id}/resume` (flag answers and review decision) — add `reviewer_id` to request body, check ownership before proceeding
+- POST `/runs/{thread_id}/release`
+- POST `/runs/{thread_id}/handover`
+
+### Configurable Timeout
+
+**Environment variable:** `CLAIM_WAITING_THRESHOLD_HOURS` (default: `4`)
+
+**Function:**
+```python
+import os
+
+def _waiting_threshold_seconds() -> int:
+    hours = float(os.getenv("CLAIM_WAITING_THRESHOLD_HOURS", "4"))
+    return int(hours * 3600)
+```
+
+**Usage:** GET `/leads/waiting` reads this on every request. Changing the env var requires a service restart (no code release).
+
+### Persistence
+
+Claim fields (`claim`, `claim_history`, `needs_review_since`) are part of the `State` TypedDict and automatically persisted by the existing checkpointer (`src/agents/runtime/checkpointer.py`). No new persistence code is needed.
+
+The checkpointer writes the full `State` to Redis (or SQLite) after every node. When the service restarts, `open_graph(thread_id)` (in `src/agents/runtime/runner.py`) loads the latest checkpoint, including all claim state.
+
+### Backward Compatibility
+
+- `claim`, `claim_history`, and `needs_review_since` are `NotRequired` fields — existing cases have them as `None` or absent
+- Claim endpoints are opt-in — if a team never calls them, the workflow is unchanged
+- Review flow (`POST /runs/{thread_id}/resume`) works with or without a claim: if no claim, no ownership check is applied
+
+---
+
+## Risks
+
+### 1. Concurrent claims
+
+**Risk:** Two reviewers claim the same case simultaneously.
+
+**Mitigation:** The checkpointer (Redis or SQLite) uses optimistic locking (checkpoint version increment). The second claim write fails and retries, sees the case is already claimed, returns 409. No data corruption, but one reviewer sees a stale "available" state briefly.
+
+**Residual risk:** Low. UI should poll or use server-sent events to reflect live claim state.
+
+### 2. Unbounded claim history
+
+**Risk:** A case handed over 100 times balloons the checkpoint size.
+
+**Mitigation:** Accept for MVP (rare). Future: archive `claim_history` to a separate store after case completion, keep only last N entries in state.
+
+### 3. Query performance
+
+**Risk:** Scanning all threads for `/reviewers/{id}/queue` and `/leads/waiting` is slow with 10,000 paused cases.
+
+**Mitigation:** Acceptable for MVP (dozens to hundreds of cases). Future: maintain Redis sorted sets indexed by reviewer and wait time, updated on claim/release.
+
+### 4. Threshold change lag
+
+**Risk:** Changing `CLAIM_WAITING_THRESHOLD_HOURS` env var requires service restart.
+
+**Mitigation:** For MVP, restart is acceptable (no data loss, just brief downtime). Future: read from Redis key polled every request.
+
+---
+
+## Open Questions
+
+*None at this time. All design choices are documented in the HLD and above.*
+
+---
+
+# Story summaries
+
+- `01-agent`: LLD — Story 01-agent: Add claim state fields and persistence
+- `02-agent`: LLD — Story 02-agent: Implement claim, release, and handover endpoints
+- `03-agent`: LLD — Story 03-agent: Implement reviewer queue endpoint
+- `04-agent`: LLD — Story 04-agent: Add ownership check middleware and modify resume endpoint
+- `05-agent`: LLD — Story 05-agent: Implement lead waiting list endpoint with configurable threshold
+- `06-agent`: LLD — Story 06-agent: End-to-end claim workflow integration test
+
+---
+
+## Why this order
+
+Follow breakdown.md dependencies; tickets listed above match scrum→Linear story order.
