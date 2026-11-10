@@ -23,7 +23,7 @@ Added critic step as requested by reviewer to validate the inline story's intern
 
 ## Steps
 
-1. [ ] **analyst (inline_story)** — Turn the ticket into Given/When/Then requirements with concrete acceptance criteria.
+1. [x] **analyst (inline_story)** — Turn the ticket into Given/When/Then requirements with concrete acceptance criteria.
    - focus: Focus on the readiness check endpoint requirements: parallel checks with timeouts, 200/503 responses, no secrets in errors, startup logging.
 2. [ ] **critic (consistency_check)** — Reviewer requested: validate the inline story for internal consistency.
    - focus: Check that the inline story's acceptance criteria match the ticket, timeout handling is clear, and no contradictions exist between the API spec and error handling.
