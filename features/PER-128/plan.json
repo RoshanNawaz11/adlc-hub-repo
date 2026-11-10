@@ -2,7 +2,7 @@
   "schema_version": 1,
   "key": "PER-128",
   "source": "llm",
-  "summary": "Single-repo optimization with state changes, routing logic, and usage tracking; needs design review before coding.",
+  "summary": "Multi-part state and routing refactor with new telemetry: needs architecture review for state schema changes, orchestrator logic changes, and cross-module consistency.",
   "track_hint": "standard",
   "loop": "feature_with_architecture",
   "delivery": "delivery",
@@ -20,8 +20,8 @@
     {
       "node": "analyst",
       "activity": "requirements",
-      "why": "Requirements are already detailed in the ticket; formalize them in Given/When/Then format.",
-      "instructions": "Focus on the three requirement groups: token usage tracking with state changes, forced routing logic, and orchestrator integration. Keep the state migration requirement explicit.",
+      "why": "Ticket already states requirements clearly; formalizing them as Given/When/Then for HLD input.",
+      "instructions": "Focus on the three separate concerns: usage telemetry schema and aggregation, forced routing logic, and orchestrator decision flow. Make the contract between State changes and orchestrator behavior explicit.",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -29,8 +29,8 @@
     {
       "node": "architect",
       "activity": "hld",
-      "why": "State schema changes (usage field, seen flags), routing component contract, and cross-component agreement need HLD.",
-      "instructions": "Design the State.usage schema and reducer, forced_route contract with broken_rules, and how orchestrator tracks seen flags. Address state migration for runs without usage.",
+      "why": "State schema changes, new routing component, and orchestrator decision logic must be designed together to ensure consistency.",
+      "instructions": "Design the usage accumulation pattern in State, the forced_route interface and its relationship to broken_rules, and how the orchestrator coordinates them. Address backward compatibility for runs without usage field.",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -38,8 +38,8 @@
     {
       "node": "scrum_master",
       "activity": "breakdown",
-      "why": "Three distinct work areas need breakdown: usage tracking, routing logic, orchestrator changes.",
-      "instructions": "Split into stories by component: route_rules changes, State and reducer, orchestrator logic, usage logging. Order by dependency.",
+      "why": "Work spans multiple modules (State, route_rules, node.py, runner.py, tools/bindings.py, model gateway) and must be sequenced for testability.",
+      "instructions": "Break down by dependency: State changes first, then route_rules, then orchestrator, then usage collection, then endpoint. Each story must be independently testable.",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -47,8 +47,8 @@
     {
       "node": "designer",
       "activity": "lld",
-      "why": "Implementation details for state reducer, forced_route algorithm, and orchestrator decision flow need concrete file plans.",
-      "instructions": "Detail the usage reducer merge logic, forced_route candidate generation without duplicating broken_rules, and orchestrator skip conditions.",
+      "why": "Implementation detail needed for State reducer logic, forced_route algorithm, and orchestrator decision tree.",
+      "instructions": "Specify exact State schema with migration strategy, forced_route's candidate enumeration, and orchestrator's decision flowchart with all guard conditions.",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -56,8 +56,8 @@
     {
       "node": "test_architect",
       "activity": "tests",
-      "why": "The ticket lists specific test scenarios for forced routing, usage accumulation, and state migration.",
-      "instructions": "Map the ticket's test requirements 1:1 to test cases, covering forced_route behavior, orchestrator model call decisions, usage tracking, and state migration.",
+      "why": "Complex logic with edge cases: multiple routes valid, flag deduplication, usage aggregation, backward compatibility.",
+      "instructions": "Map tests to ACs 1:1, especially forced_route's candidate logic, orchestrator's model-call guards, and usage accumulation across retries.",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -74,8 +74,8 @@
     {
       "node": "critic",
       "activity": "consistency_check",
-      "why": "State schema, routing contract, and orchestrator behavior must agree across HLD, breakdown, and stories.",
-      "instructions": "",
+      "why": "Multiple documents must agree on State schema, routing contract, and orchestrator behavior.",
+      "instructions": "Verify State usage schema matches across HLD, stories and tests; forced_route contract is consistent between HLD and LLD; orchestrator decision logic in HLD matches implementation plan in stories.",
       "auto": false,
       "status": "pending",
       "rerun": false
@@ -138,14 +138,14 @@
   "skipped": [
     {
       "node": "tpm_gate",
-      "why": "Requirements and scope are clearly stated in the ticket; no product ambiguity or user-facing decisions."
+      "why": "Ticket states scope and acceptance criteria clearly; no ambiguity or cross-team coordination needed."
     }
   ],
   "suggested_roles": [],
   "suggested_loops": [],
   "notes": [],
-  "created_at": "2026-11-09T11:07:48.444365+00:00",
-  "version": 1,
+  "created_at": "2026-11-09T12:34:04.803605+00:00",
+  "version": 3,
   "trigger": "ticket",
   "gate": null,
   "feedback": [],

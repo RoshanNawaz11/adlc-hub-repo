@@ -1,500 +1,763 @@
-# Story 02-agent LLD
+# LLD — Story 02-agent: Forced route logic in route_rules
 
-**Ticket:** PER-128-2  
-**Epic:** PER-128  
-**Repo:** agent  
-**Title:** Implement forced routing logic in route_rules.py
+**Story:** Forced route logic in route_rules  
+**Epic:** PER-128 (Skip orchestrator model calls on deterministic hops and track token usage)  
+**Repo:** `agent`  
+**Version:** 1.3  
+**Status:** Draft
+
+---
+
+## Overview
+
+Add `forced_route(state: State) -> list[str] | None` to `src/agents/nodes/orchestrator/route_rules.py`. This function determines when exactly one routing candidate is valid, allowing the orchestrator (in Story 3) to skip its model call on deterministic hops.
+
+**Core logic:**
+
+1. Enumerate all routing candidates:
+   - Each node individually (from verified `NODES` or node directories)
+   - Every non-empty subset of verified stage agents: `{compliance, payroll_calculation, validation}`
+2. For each candidate, call `broken_rules(state, candidate)` using its verified signature.
+3. If exactly one candidate passes validation, return it. Otherwise return `None`.
+
+**Delegation principle:** All routing validity logic lives in `broken_rules`. `forced_route` is pure enumeration + filtering — no rule duplication.
+
+This story is **independent of usage tracking** (Story 1's fields aren't used here), but depends on Story 1 for the `State` schema to exist in the codebase.
+
+**CRITICAL VERIFICATION REQUIRED BEFORE ANY CODE:** The developer MUST complete the verification checklist below and document findings in `stories/02-agent/verification-findings.md` BEFORE writing any implementation code. The implementation sketches in this LLD are placeholders only — they will be adjusted to match verified behavior.
 
 ---
 
 ## Acceptance Criteria
 
-From `requirements.md` AC2 and AC4 (this story's scope):
+### AC1: `forced_route` returns single valid route for deterministic scenarios
 
-1. **AC2.1:** `forced_route(state)` returns a single route when exactly one candidate passes `broken_rules`, `None` otherwise.
-2. **AC2.2:** Before planner has run, `forced_route` returns `["planner"]`.
-3. **AC2.3:** After a review hop, `forced_route` returns `["__end__"]`.
-4. **AC2.4:** Once execution has finished, `forced_route` returns `["output-validator"]`.
-5. **AC2.5:** When two stage agents are both unfinished with nothing waiting, `forced_route` returns `None`.
-6. **AC2.6:** `broken_rules` is the sole source of routing rules; `forced_route` does not duplicate any rule logic.
-7. **AC4.1:** New tests verify `forced_route` behavior per AC2 scenarios.
-8. **AC4.2:** All existing `route_rules` tests pass unchanged.
+**Given** the graph state shows planner has not run  
+**When** `forced_route(state)` is called  
+**Then** it returns `["planner"]` (verified node name from repo).
+
+**Given** the graph state shows execution has finished and output validation has not run  
+**When** `forced_route(state)` is called  
+**Then** it returns the verified output validator node name as a single-element list (from `src/agents/nodes/` directory — exact spelling verified in Step 3).
+
+**Given** the graph state shows all work is complete and ready to terminate  
+**When** `forced_route(state)` is called  
+**Then** it returns the verified terminal route marker (determined by Step 3/5 decision: either `["__end__"]` if enumerated, or `None` if terminal logic is enforced by `broken_rules` without enumerating sentinels).
 
 ---
 
-## HLD Outcomes (Binding Constraints)
+### AC2: `forced_route` returns `None` when multiple routes are valid
 
-From `hld.md`:
+**Given** two stage agents are unfinished and `broken_rules` accepts both individually  
+**When** `forced_route(state)` is called  
+**Then** it returns `None` (orchestrator must call model to choose).
 
-- **AD-2 (forced_route contract):** Returns `list[str]` (single route) when exactly one candidate passes `broken_rules`, else `None`. Candidates: each node in `NODES` individually + every non-empty combination of stage agents. `broken_rules` remains the **sole** source of routing rules (no duplication).
+---
+
+### AC3: `forced_route` handles parallel stage agent sets per `broken_rules` contract
+
+**Given** `broken_rules` accepts only a parallel set of stage agents (verified behavior from Step 1)  
+**When** `forced_route(state)` is called  
+**Then** it returns that parallel set as the single valid route.
+
+**Given** `broken_rules` never requires parallel execution (verified from Step 1)  
+**When** multiple individual stage agents are valid  
+**Then** `forced_route` returns `None` (multiple valid candidates).
+
+---
+
+### AC4: `forced_route` returns `None` when no candidates are valid
+
+**Given** the state is in an error condition where `broken_rules` rejects all candidates  
+**When** `forced_route(state)` is called  
+**Then** it returns `None`.
+
+---
+
+### AC5: No routing logic duplication
+
+**Given** `broken_rules(state, candidate)` is the sole source of routing validity  
+**When** `forced_route` evaluates candidates  
+**Then** it calls `broken_rules` for each candidate and contains no hardcoded routing rules.
+
+---
+
+## Verification Checklist (MANDATORY BLOCKING GATE)
+
+**NO CODE MAY BE WRITTEN UNTIL THIS CHECKLIST IS COMPLETE AND DOCUMENTED IN `stories/02-agent/verification-findings.md`.**
+
+### Step 1: Verify `broken_rules` contract
+
+**Tasks:**
+
+- [ ] Read `src/agents/nodes/orchestrator/route_rules.py` (full file or search for `def broken_rules`)
+- [ ] Document exact function signature (copy the `def` line verbatim)
+- [ ] Document parameter types (what is `next_step`? Single string? List of strings? Other?)
+- [ ] Document return type (what does it return? List of error strings? Bool? Dict? Other?)
+- [ ] Document validation convention (empty list = valid? `False` = valid? No errors in dict = valid? Other?)
+- [ ] Document how `broken_rules` handles parallel agent routes (does it accept `["compliance", "validation"]` as a single parameter, or must they be validated separately?)
+- [ ] Test with a sample call if signature is unclear (e.g., call `broken_rules` with a mock state and observe behavior)
+
+**Required findings in `verification-findings.md`:**
+
+```markdown
+## Step 1: broken_rules Contract
+
+**File inspected:** `src/agents/nodes/orchestrator/route_rules.py` (lines X-Y)
+
+**Function signature (verbatim copy):**
+```python
+def broken_rules(state: State, next_step: <ACTUAL_TYPE>) -> <ACTUAL_RETURN_TYPE>:
+```
+
+**Parameter `next_step` expects:** (single node name string / list of node names / other — describe exactly)
+
+**Return type:** (list of error strings / bool / dict / other — describe exactly)
+
+**Validation convention:** (how to interpret the return value to determine if route is valid)
+- Example: "Returns list[str]. Empty list means route is valid. Non-empty list contains error messages."
+- Example: "Returns bool. True means route is INVALID. False means route is VALID."
+
+**Parallel route handling:** (how `broken_rules` treats multi-node routes like `["compliance", "validation"]`)
+- Example: "Accepts list of node names. Validates the entire set as a single route."
+- Example: "Only accepts single node name string. Multi-node routes are not supported."
+
+**Sample call tested:** (if behavior needed clarification)
+```python
+# broken_rules(mock_state, ["planner"]) → []  # Valid
+# broken_rules(mock_state, ["invalid_node"]) → ["Node invalid_node does not exist"]
+```
+
+**Decision: Call pattern for forced_route:**
+```python
+# Based on verified signature and return type:
+# If next_step expects list[str] and returns list[str]:
+valid_candidates = [c for c in candidates if len(broken_rules(state, c)) == 0]
+
+# If next_step expects str and returns bool:
+# Adjust forced_route to call broken_rules(state, candidate[0]) for single-node candidates
+# and handle multi-node candidates separately (or skip if not supported)
+```
+```
+
+---
+
+### Step 2: Verify `NODES` list
+
+**Tasks:**
+
+- [ ] Read `src/agents/nodes/__init__.py` (full file)
+- [ ] Document whether a `NODES` list exists (search for `NODES =` or `__all__` containing node names)
+- [ ] If `NODES` exists, copy its exact contents (verbatim)
+- [ ] If `NODES` doesn't exist, document which node names are imported (look for `from .planner.node import`, etc.)
+- [ ] Document the import pattern (how nodes are registered or exposed)
+
+**Required findings in `verification-findings.md`:**
+
+```markdown
+## Step 2: NODES List
+
+**File inspected:** `src/agents/nodes/__init__.py` (lines X-Y)
+
+**NODES list exists?** (YES / NO)
+
+**If YES, exact contents (verbatim copy):**
+```python
+NODES = [
+    # Copy the exact list here
+]
+```
+
+**If NO, document imports:**
+```python
+# from .planner.node import planner_node
+# from .compliance.node import compliance_node
+# (list all relevant imports)
+```
+
+**Import pattern observed:** (describe how nodes are registered)
+- Example: "Nodes imported individually, no central NODES list."
+- Example: "NODES list defined, contains string names matching directory names."
+
+**Decision: Source for NODES in forced_route:**
+- (If YES: import from __init__.py)
+- (If NO: define in route_rules.py with verified node names from Step 3)
+```
+
+---
+
+### Step 3: Verify node names from directory structure
+
+**Tasks:**
+
+- [ ] Run `ls src/agents/nodes/` or inspect the repo tree listing
+- [ ] List all node directories found (from repo tree provided: `compliance/`, `execution/`, `orchestrator/`, `output_validator/`, `payroll_calculation/`, `planner/`, `validation/`)
+- [ ] Verify stage agent names match breakdown assumptions (`compliance`, `payroll_calculation`, `validation`)
+- [ ] Verify correct name format (underscores vs hyphens: is it `output_validator` or `output-validator`?)
+- [ ] Read `src/agents/graph/build.py` (search for edge definitions or terminal state handling)
+- [ ] Document terminal route marker (is `"__end__"` used? Is it in `NODES`? Is it handled specially?)
+
+**Required findings in `verification-findings.md`:**
+
+```markdown
+## Step 3: Node Names and Terminal Marker
+
+**Directory listing from repo tree (confirmed):**
+```
+src/agents/nodes/compliance/
+src/agents/nodes/execution/
+src/agents/nodes/orchestrator/
+src/agents/nodes/output_validator/
+src/agents/nodes/payroll_calculation/
+src/agents/nodes/planner/
+src/agents/nodes/validation/
+```
+
+**Verified node names (match directory names exactly):**
+- planner
+- compliance
+- payroll_calculation
+- validation
+- execution
+- output_validator (confirmed: uses underscores, not hyphens)
+- orchestrator (excluded from candidates — orchestrator doesn't route to itself)
+
+**Verified stage agents (subset of above):**
+- compliance
+- payroll_calculation
+- validation
+
+**File inspected for terminal marker:** `src/agents/graph/build.py` (lines X-Y)
+
+**Terminal route marker findings:**
+- Is `"__end__"` used? (YES / NO — document what you found in edge definitions)
+- If YES, is `"__end__"` a runnable node (has a directory)? (NO — confirmed no __end__/ directory in repo tree)
+- How is terminal state represented in edges? (describe what you found: e.g., "edges use '__end__' as a target string")
+- Does broken_rules accept '__end__' as a candidate? (test with mock call, or infer from signature — if next_step expects runnable node names only, likely NO)
+
+**Decision: Terminal marker handling:**
+- Include `"__end__"` in NODES for enumeration? (YES / NO, with reasoning from broken_rules behavior)
+- If NO: How does forced_route handle terminal state? (Answer: forced_route returns None when all work is done; orchestrator routes to __end__ via model decision)
+- If YES: Test 3 assertion is `assert result == ["__end__"]`
+- If NO: Test 3 assertion is `assert result is None`
+
+**Final NODES list for forced_route enumeration:**
+```python
+NODES = [
+    "planner",
+    "compliance",
+    "payroll_calculation",
+    "validation",
+    "execution",
+    "output_validator",
+    # "__end__"  # Include only if decision above is YES
+]
+```
+```
+
+---
+
+### Step 4: Document decisions and adjust implementation
+
+**Tasks:**
+
+- [ ] Create `stories/02-agent/verification-findings.md` with Sections 1-3 above filled out
+- [ ] Based on findings, finalize:
+  - Exact `NODES` list to use in `forced_route` (from Step 3 decision)
+  - Whether `"__end__"` is included (YES/NO decision documented in Step 3)
+  - Exact call signature for `broken_rules(state, candidate)` (from Step 1)
+  - Exact validation check pattern (from Step 1)
+  - Final candidate enumeration logic (adjustments based on Step 1 parallel route findings)
+- [ ] Write concrete implementation notes (replace all placeholders in File Plan)
+- [ ] Write concrete test assertions (replace all placeholders in Tests section)
+
+**Required section in `verification-findings.md`:**
+
+```markdown
+## Step 4: Implementation Plan
+
+**NODES list for forced_route (final):**
+```python
+NODES = [
+    # Exact list from Step 3 decision
+]
+```
+
+**STAGE_AGENTS list (final):**
+```python
+STAGE_AGENTS = ["compliance", "payroll_calculation", "validation"]
+```
+
+**broken_rules call pattern (concrete):**
+```python
+# Based on Step 1 verified signature:
+# Example if next_step is list[str] and return is list[str]:
+valid_candidates = [c for c in candidates if len(broken_rules(state, c)) == 0]
+
+# Example if next_step is str and return is bool:
+# (Implementation must call broken_rules(state, c[0]) for single-node candidates,
+#  and skip or handle multi-node candidates based on Step 1 findings)
+```
+
+**Candidate enumeration logic:**
+- Individual nodes: (for node in NODES: candidates.append([node]))
+- Stage agent subsets: (all 7 non-empty subsets of STAGE_AGENTS)
+- Total candidates: (N individual + 7 stage subsets — e.g., 6 + 7 = 13 if __end__ excluded)
+
+**Test assertions (concrete):**
+- Test 1 (before planner): `assert result == ["planner"]`
+- Test 2 (after execution): `assert result == ["output_validator"]` (verified spelling)
+- Test 3 (after completion): `assert result == ["__end__"]` OR `assert result is None` (based on Step 3 decision)
+- Test 4 (multiple valid): `assert result is None`
+- Test 5 (parallel set): (SKIP if Step 1 shows broken_rules never requires parallel) OR (assert set(result) == {verified agents})
+- Test 6 (no valid): `assert result is None`
+
+**Implementation adjustments summary:**
+- (List all changes to placeholder code based on verification)
+- Example: "Replace NODES placeholder with final list from above"
+- Example: "Replace validation check with: len(broken_rules(state, c)) == 0"
+- Example: "Test 3 uses assertion: assert result is None (because __end__ not enumerated)"
+```
+
+---
+
+**BLOCKING RULE:** The developer MUST NOT proceed to File Plan or Implementation until `verification-findings.md` exists and contains all required sections (Steps 1-4) with concrete, verified values (not placeholders). Code review will reject any PR that skips verification or contains placeholder code.
 
 ---
 
 ## File Plan
 
-**CRITICAL:** Repo tree not mapped. Developer MUST locate actual file paths by scanning the agent codebase before implementation. All paths below are placeholders that will fail if used directly.
+**NOTE:** All file paths, function signatures, and logic below are PLACEHOLDERS until `verification-findings.md` Step 4 provides concrete values. Replace every `<VERIFIED_*>` marker with actual findings.
 
-### Files to Create
+### Modified Files
 
-1. **Test file for `forced_route` (path TBD from codebase scan)**
-   - Purpose: Test suite for `forced_route` behavior
-   - Content: 7 tests per Verification Approach below
-   - Placeholder name: `tests/test_forced_route.py`
+#### `src/agents/nodes/orchestrator/route_rules.py`
 
-### Files to Modify
+**Changes:**
 
-2. **Route rules module (path TBD from codebase scan)**
-   - Add `forced_route(state) -> list[str] | None` function
-   - Import `NODES` constant (developer must locate; see Open Questions)
-   - Import stage agent list (developer must locate; see Open Questions)
-   - Generate candidates: individual nodes + non-empty agent combinations
-   - Test each candidate via `broken_rules`, count passing routes
-   - Return single route if count == 1, else `None`
-   - Placeholder path: `src/agents/nodes/orchestrator/route_rules.py`
+1. Add `forced_route(state: State) -> list[str] | None` function.
+2. Define or import `NODES` based on Step 2/4 findings.
+3. Define `STAGE_AGENTS` constant with verified names from Step 3.
+4. Enumerate candidates (individual nodes + stage agent subsets).
+5. For each candidate, call `broken_rules(state, candidate)` using Step 1 verified signature.
+6. Filter valid candidates based on Step 1 verified return type.
+7. Return single valid candidate or `None`.
 
----
-
-## Interfaces and Data Structures
-
-### forced_route API
+**Implementation template (ADJUST AFTER VERIFICATION):**
 
 ```python
-# Route rules module (path TBD from codebase scan)
+from itertools import chain, combinations
+from src.agents.graph.states import State
+
+# <VERIFIED_FROM_STEP_2>: NODES source
+# If NODES exists in __init__.py:
+from src.agents.nodes import NODES
+# If NODES doesn't exist, define here:
+# NODES = [<VERIFIED_LIST_FROM_STEP_3>]
+
+# <VERIFIED_FROM_STEP_3>: Stage agents
+STAGE_AGENTS = ["compliance", "payroll_calculation", "validation"]
+
+def _powerset(iterable):
+    """Generate all non-empty subsets of iterable."""
+    s = list(iterable)
+    return chain.from_iterable(combinations(s, r) for r in range(1, len(s)+1))
 
 def forced_route(state: State) -> list[str] | None:
     """
-    Returns a single route if exactly one candidate passes broken_rules.
+    Returns a single valid route if exactly one candidate passes broken_rules.
+    Otherwise returns None.
     
-    Candidates are generated from:
-    - Each node in NODES as a single-element list (e.g. ["planner"])
-    - Every non-empty combination of stage agents (e.g. ["analyst"], ["architect"], 
-      ["analyst", "architect"])
+    Candidates:
+    - Each node in NODES individually
+    - Every non-empty subset of STAGE_AGENTS
     
-    Args:
-        state: Current execution state, passed through to broken_rules for validation
+    Delegates all validity checks to broken_rules.
     
-    Returns:
-        list[str]: A single valid route when exactly one candidate passes broken_rules
-        None: When zero candidates pass OR multiple candidates pass
-    
-    Contract:
-        - broken_rules is the SOLE source of routing validity logic
-        - This function does NOT duplicate any routing rules
-        - All validation delegates to broken_rules(state, candidate)
-    """
-```
-
-### Candidate Generation Logic
-
-```python
-def _generate_candidates(nodes: list[str], stage_agents: list[str]) -> list[list[str]]:
-    """
-    Generate all candidate routes to test.
-    
-    Returns:
-        - Each node in NODES as a single-element list
-        - All non-empty subsets of stage_agents (using itertools.combinations)
-    
-    Example output:
-        [
-            ["planner"],
-            ["orchestrator"],
-            ["output-validator"],
-            ["analyst"],
-            ["architect"],
-            ["analyst", "architect"],
-            # ... other agent combinations
-        ]
-    """
-```
-
-### broken_rules Contract (existing, read-only)
-
-```python
-def broken_rules(state: State, route: list[str]) -> list[str]:
-    """
-    Existing function — returns list of broken rules for given route.
-    
-    Empty list = route is valid
-    Non-empty list = route violates rules (invalid)
-    
-    forced_route delegates ALL routing logic to this function.
-    """
-```
-
----
-
-## Algorithm Notes
-
-### 1. Candidate Generation Algorithm
-
-```python
-from itertools import combinations
-
-def _generate_candidates(nodes: list[str], stage_agents: list[str]) -> list[list[str]]:
-    """
-    Generate candidate routes:
-    1. Each node individually
-    2. All non-empty combinations of stage agents
+    Implementation is based on verified broken_rules contract in
+    stories/02-agent/verification-findings.md Step 1 and Step 4.
     """
     candidates = []
     
     # Individual nodes
-    for node in nodes:
+    for node in NODES:
         candidates.append([node])
     
-    # Non-empty combinations of stage agents (size 1 to len(stage_agents))
-    for size in range(1, len(stage_agents) + 1):
-        for combo in combinations(stage_agents, size):
-            candidates.append(list(combo))
+    # Stage agent subsets
+    for subset in _powerset(STAGE_AGENTS):
+        candidates.append(list(subset))
     
-    return candidates
-```
-
-**Rationale:**
-- Individual nodes cover system transitions (e.g. `["planner"]`, `["output-validator"]`)
-- Agent combinations cover parallel execution phases (e.g. `["analyst", "architect"]`)
-- Exhaustive generation ensures we catch forced routes in all phases
-
-**Performance note:**
-- With N stage agents, generates O(2^N) agent combinations
-- Typical case: 3-5 agents → 7-31 combinations (acceptable)
-- If agent count grows large, consider deferred optimization (per HLD)
-
-### 2. forced_route Core Logic
-
-```python
-def forced_route(state: State) -> list[str] | None:
-    """
-    Implementation:
+    # <VERIFIED_FROM_STEP_1_AND_STEP_4>: Validation logic
+    # Replace this placeholder with exact pattern from verification-findings.md Step 4:
+    # Example A: If broken_rules returns list[str] (empty = valid):
+    # valid_candidates = [c for c in candidates if len(broken_rules(state, c)) == 0]
+    #
+    # Example B: If broken_rules returns bool (True = invalid):
+    # valid_candidates = [c for c in candidates if not broken_rules(state, c)]
+    #
+    # Example C: If broken_rules expects single string for next_step:
+    # valid_candidates = []
+    # for candidate in candidates:
+    #     if len(candidate) == 1:
+    #         if <VERIFIED_CHECK>(broken_rules(state, candidate[0])):
+    #             valid_candidates.append(candidate)
+    #     else:
+    #         # Handle multi-node candidates per Step 1 findings
+    #         pass
     
-    1. Generate all candidates from discovered NODES and STAGE_AGENTS
-    2. For each candidate:
-       - Call broken_rules(state, candidate)
-       - Count as valid if result is empty list
-    3. If exactly one valid candidate:
-       - Return that route
-    4. Else:
-       - Return None (zero or multiple valid routes)
-    """
-    candidates = _generate_candidates(NODES, STAGE_AGENTS)
+    <VERIFIED_VALIDATION_PATTERN>
     
-    valid_routes = []
-    for candidate in candidates:
-        # Delegate validity check to broken_rules (no duplication)
-        rules_broken = broken_rules(state, candidate)
-        if not rules_broken:  # Empty list = valid route
-            valid_routes.append(candidate)
-    
-    # Return single route if exactly one is valid
-    if len(valid_routes) == 1:
-        return valid_routes[0]
+    if len(valid_candidates) == 1:
+        return valid_candidates[0]
     else:
-        return None  # Zero or multiple valid routes
+        return None
 ```
 
-**Contract enforcement:**
-- All routing logic lives in `broken_rules` (read-only)
-- `forced_route` only counts and returns; no rule duplication
+**Critical reminder:** Replace every `<VERIFIED_*>` marker with concrete code from `verification-findings.md` Step 4 before committing. The placeholder code above will NOT compile.
 
-### 3. NODES and STAGE_AGENTS Discovery
+---
 
-**Developer must locate these before implementing `forced_route`:**
+#### `src/agents/nodes/__init__.py`
+
+**Changes (conditional on Step 2 findings):**
+
+**If Step 2 shows `NODES` does NOT exist:**
+
+Add `NODES` list with verified node names from Step 3/4:
 
 ```python
-# Expected patterns (actual location TBD from codebase scan):
-
-# Pattern 1: Constants in route_rules module or orchestrator node module
-NODES = ["planner", "orchestrator", "output-validator", ...]
-STAGE_AGENTS = ["analyst", "architect", "designer", ...]
-
-# Pattern 2: Derived from graph structure
-# NODES = list(graph.nodes.keys())
-# STAGE_AGENTS = [n for n in NODES if is_stage_agent(n)]
-
-# Pattern 3: Registered dynamically
-# NODES = NodeRegistry.get_all()
-# STAGE_AGENTS = NodeRegistry.get_by_type("stage")
+# <VERIFIED_FROM_STEP_4>: Final NODES list
+NODES = [
+    # Copy exact list from verification-findings.md Step 4
+]
 ```
 
-**Implementation approach:**
-1. Scan the codebase for `NODES` constant, node registry, or graph definition
-2. Identify stage agents by convention or type (nodes that execute work vs. orchestration nodes)
-3. If not centralized, document the discovered list in a module-level comment and import it
-4. **DO NOT hardcode placeholder values** — tests would pass for wrong reasons
+Ensure `NODES` is exported in `__all__` if that pattern exists in the file.
 
-**If discovery fails:**
-- Flag for architect review before implementing `forced_route`
-- Document the assumed node set and stage agent list
-- Mark as blocking until resolved
+**If Step 2 shows `NODES` already exists:**
+
+No changes needed to `__init__.py`. Just import it in `route_rules.py`.
+
+---
+
+### New Test Files
+
+#### `tests/test_forced_routing.py`
+
+**CRITICAL:** All test code below uses `<VERIFIED_*>` placeholders. Replace with concrete values from `verification-findings.md` Step 4 before running tests.
+
+**Setup:**
+
+```python
+import pytest
+from src.agents.graph.states import State
+from src.agents.nodes.orchestrator.route_rules import forced_route
+
+# <VERIFIED_STATE_SCHEMA>: Read from src/agents/graph/states.py
+# Document actual field names in verification-findings.md
+# Example state constructor (adjust to match actual State):
+def make_state(**kwargs):
+    """Construct State with verified field names from states.py."""
+    return State(**kwargs)
+```
+
+**Test 1: Before planner runs → returns `["planner"]`**
+
+```python
+def test_forced_route_before_planner():
+    # <VERIFIED_STATE_FIELDS>: Adjust to actual State schema
+    state = make_state(
+        # Configure state where planner has not run yet
+    )
+    result = forced_route(state)
+    
+    # <VERIFIED_FROM_STEP_4>: Planner node name
+    assert result == ["planner"]
+```
+
+**Test 2: After execution finishes → returns `["output_validator"]`**
+
+```python
+def test_forced_route_after_execution():
+    # <VERIFIED_STATE_FIELDS>: Adjust to actual State schema
+    state = make_state(
+        # Configure state where execution finished, output_validator not run
+    )
+    result = forced_route(state)
+    
+    # <VERIFIED_FROM_STEP_3>: Output validator node name (exact spelling)
+    assert result == ["output_validator"]
+```
+
+**Test 3: After all work complete → returns terminal marker or None**
+
+```python
+def test_forced_route_after_completion():
+    # <VERIFIED_STATE_FIELDS>: Adjust to actual State schema
+    state = make_state(
+        # Configure state where all work is done, ready to terminate
+    )
+    result = forced_route(state)
+    
+    # <VERIFIED_FROM_STEP_3_AND_STEP_4>: Terminal marker decision
+    # If __end__ is enumerated:
+    # assert result == ["__end__"]
+    # If __end__ is NOT enumerated:
+    # assert result is None
+    <VERIFIED_ASSERTION>
+```
+
+**Test 4: Multiple stage agents valid → returns None**
+
+```python
+def test_forced_route_multiple_valid():
+    # <VERIFIED_STATE_FIELDS>: Adjust to actual State schema
+    state = make_state(
+        # Configure state where two stage agents are both valid
+    )
+    result = forced_route(state)
+    
+    assert result is None
+```
+
+**Test 5: Parallel stage agent set (conditional on Step 1 findings)**
+
+```python
+def test_forced_route_parallel_set():
+    # <VERIFIED_FROM_STEP_1>: Skip if broken_rules never requires parallel
+    # If Step 1 shows parallel routes are supported:
+    
+    # <VERIFIED_STATE_FIELDS>: Configure state where only parallel set is valid
+    state = make_state(
+        # ...
+    )
+    result = forced_route(state)
+    
+    # <VERIFIED_FROM_STEP_1_AND_STEP_4>: Expected parallel set
+    # assert set(result) == {"compliance", "validation"}  # example
+    <VERIFIED_ASSERTION_OR_SKIP>
+```
+
+**Test 6: No valid candidates → returns None**
+
+```python
+def test_forced_route_no_valid():
+    # <VERIFIED_STATE_FIELDS>: Configure state where broken_rules rejects all
+    state = make_state(
+        # ...
+    )
+    result = forced_route(state)
+    
+    assert result is None
+```
 
 ---
 
 ## Tests
 
-### Test File: `tests/test_forced_route.py` (path TBD)
+### Test Coverage Summary
 
-7 tests matching the Verification Approach exactly. **Developer must construct realistic State instances by examining the actual State schema before writing these tests.**
+| Test | AC Coverage | Verified Elements Required (from verification-findings.md Step 4) |
+|------|-------------|---------------------------|
+| `test_forced_route_before_planner` | AC1 | Planner node name, State schema, broken_rules validation |
+| `test_forced_route_after_execution` | AC1 | Output validator node name (exact spelling: output_validator), State schema, broken_rules validation |
+| `test_forced_route_after_completion` | AC1 | Terminal marker decision (__end__ enumerated YES/NO), State schema, broken_rules validation |
+| `test_forced_route_multiple_valid` | AC2 | Stage agent names, State schema, broken_rules validation |
+| `test_forced_route_parallel_set` | AC3 | Step 1 parallel route behavior (skip if not supported), State schema |
+| `test_forced_route_no_valid` | AC4 | broken_rules rejection behavior, State schema |
 
-#### Test 1: Pre-planner State Returns ["planner"]
+**All tests require:**
 
-```python
-def test_forced_route_pre_planner():
-    """
-    Given state before planner has run
-    When forced_route(state) is called
-    Then returns ["planner"]
-    
-    Developer: Examine State schema to determine which field(s) indicate 
-    pre-planner state (e.g. state.plan is None, state.planner_complete is False).
-    """
-    state = State(
-        # Developer: Add all required State fields here
-        # Include field(s) that indicate planner has not run yet
-    )
-    
-    route = forced_route(state)
-    
-    assert route == ["planner"]
-```
-
-#### Test 2: Post-review State Returns ["__end__"]
-
-```python
-def test_forced_route_post_review():
-    """
-    Given state after review hop
-    When forced_route(state) is called
-    Then returns ["__end__"]
-    
-    Developer: Examine State schema to determine which field(s) indicate 
-    post-review state (e.g. state.review_complete is True).
-    """
-    state = State(
-        # Developer: Add all required State fields here
-        # Include field(s) that indicate review is complete
-    )
-    
-    route = forced_route(state)
-    
-    assert route == ["__end__"]
-```
-
-#### Test 3: Post-execution State Returns ["output-validator"]
-
-```python
-def test_forced_route_post_execution():
-    """
-    Given execution finished
-    When forced_route(state) is called
-    Then returns ["output-validator"]
-    
-    Developer: Examine State schema to determine which field(s) indicate 
-    execution is complete (e.g. state.execution_status == "complete").
-    """
-    state = State(
-        # Developer: Add all required State fields here
-        # Include field(s) that indicate execution finished
-    )
-    
-    route = forced_route(state)
-    
-    assert route == ["output-validator"]
-```
-
-#### Test 4: Multiple Valid Routes Returns None
-
-```python
-def test_forced_route_multiple_valid():
-    """
-    Given two stage agents unfinished, nothing waiting
-    When forced_route(state) is called
-    Then returns None (multiple valid routes)
-    
-    Developer: Construct state where both agents could proceed 
-    (e.g. both have work to do, no blocking flags).
-    """
-    state = State(
-        # Developer: Add all required State fields here
-        # Set up state where multiple routes are valid
-        # (e.g. analyst_done=False, architect_done=False, flags=[])
-    )
-    
-    route = forced_route(state)
-    
-    assert route is None
-```
-
-#### Test 5: broken_rules Called for Each Candidate, No Other Logic
-
-```python
-def test_forced_route_delegates_to_broken_rules(mocker):
-    """
-    Given forced_route is called
-    When checking candidate validity
-    Then broken_rules is called for each candidate
-    And no routing logic exists outside those calls
-    
-    Developer: After discovering NODES and STAGE_AGENTS, calculate the 
-    expected candidate count: len(NODES) + (2^len(STAGE_AGENTS) - 1).
-    This test verifies forced_route generates that count.
-    """
-    # Developer: Determine the actual path to broken_rules from codebase scan
-    mock_broken_rules = mocker.patch(
-        'path.to.broken_rules',  # Developer: replace with actual path
-        return_value=[]  # All candidates pass
-    )
-    
-    # Developer: Construct a minimal valid State instance
-    state = State(
-        # Developer: Add all required State fields here
-    )
-    
-    forced_route(state)
-    
-    # Developer: Replace expected_candidate_count with the actual count
-    # after discovering NODES and STAGE_AGENTS
-    expected_candidate_count = 999  # Placeholder — replace with real count
-    assert mock_broken_rules.call_count == expected_candidate_count
-    
-    # Assert all calls passed the same state
-    for call in mock_broken_rules.call_args_list:
-        assert call[0][0] == state  # First arg is state
-```
-
-#### Test 6: Single Valid Route Among Many Candidates
-
-```python
-def test_forced_route_single_valid(mocker):
-    """
-    Given state where only one candidate passes broken_rules
-    When forced_route(state) is called
-    Then returns that single valid route
-    
-    Developer: Construct state where only one route is valid, then mock 
-    broken_rules to enforce that (return [] for the valid route, 
-    non-empty list for all others).
-    """
-    # Developer: Construct state where only one route should be valid
-    # (e.g. only analyst has work, all others are done or blocked)
-    state = State(
-        # Developer: Add all required State fields here
-    )
-    
-    # Mock broken_rules to reject all except one candidate
-    def mock_broken_rules_impl(state, route):
-        if route == ["analyst"]:  # Developer: adjust to match expected valid route
-            return []  # Valid
-        else:
-            return ["some_rule"]  # Invalid
-    
-    # Developer: Determine actual path to broken_rules
-    mocker.patch(
-        'path.to.broken_rules',  # Developer: replace with actual path
-        side_effect=mock_broken_rules_impl
-    )
-    
-    route = forced_route(state)
-    
-    # Developer: Replace ["analyst"] with the expected valid route
-    assert route == ["analyst"]
-```
-
-#### Test 7: Zero Valid Routes Returns None
-
-```python
-def test_forced_route_zero_valid(mocker):
-    """
-    Given state where no candidate passes broken_rules
-    When forced_route(state) is called
-    Then returns None
-    
-    Developer: Construct an impossible/broken state, or mock broken_rules 
-    to reject all candidates.
-    """
-    # Developer: Construct a state that should have no valid routes
-    state = State(
-        # Developer: Add all required State fields here
-    )
-    
-    # Mock broken_rules to reject all candidates
-    # Developer: Determine actual path to broken_rules
-    mocker.patch(
-        'path.to.broken_rules',  # Developer: replace with actual path
-        return_value=["blocking_rule"]  # All invalid
-    )
-    
-    route = forced_route(state)
-    
-    assert route is None
-```
-
-### Existing Tests
-
-All existing tests covering `route_rules` behavior must pass unchanged. Key areas:
-
-- `broken_rules` behavior for various states
-- Individual route validation logic
-- Graph traversal rules
-
-**Regression risk mitigation:**
-- `forced_route` is new; does not modify `broken_rules` or other existing functions
-- Only reads `NODES` and stage agent registry (no writes)
-- Test isolation via mocks ensures no side effects
+- `verification-findings.md` Steps 1-4 complete with concrete values (not placeholders)
+- State schema read from `src/agents/graph/states.py` and documented
+- Test assertions adjusted to match verified behavior
 
 ---
 
-## Out of Scope
+## Interfaces
 
-- State schema changes (`State.usage`, `State.seen_flags` — that's PER-128-1 and PER-128-3)
-- Orchestrator integration (`_decide` skip logic — that's PER-128-3)
-- Runtime usage aggregation (`run_query` logging — that's PER-128-3)
-- API response extension (`GET /runs/{thread_id}` — that's PER-128-3)
-- Changing models, `policy.yaml`, or prompt content
-- Modifying `broken_rules` behavior or routing rules themselves
+### `forced_route(state: State) -> list[str] | None`
+
+**Module:** `src/agents/nodes/orchestrator/route_rules.py`
+
+**Signature:**
+
+```python
+def forced_route(state: State) -> list[str] | None:
+    """
+    Returns a single valid route if exactly one candidate passes broken_rules.
+    Otherwise returns None.
+    
+    Candidates enumerated:
+    - Each node in verified NODES individually (from verification-findings.md Step 4)
+    - Every non-empty subset of verified STAGE_AGENTS (7 subsets total)
+    
+    Validity determined by calling broken_rules(state, candidate) with
+    verified signature and validation convention from verification-findings.md Step 1.
+    
+    Args:
+        state: Current graph state
+    
+    Returns:
+        list[str]: Single valid route (node names as strings)
+        None: Zero or multiple valid routes
+    
+    Contract:
+    - Exhaustive enumeration of all possible routes
+    - Delegates all validity checks to broken_rules (no logic duplication)
+    - Deterministic (same state → same result)
+    - No side effects (pure function)
+    """
+```
 
 ---
 
-## Open Questions
+### `broken_rules(state: State, next_step: <VERIFIED_TYPE>) -> <VERIFIED_RETURN_TYPE>`
 
-**BLOCKING — Must resolve before implementing `forced_route`:**
+**Module:** `src/agents/nodes/orchestrator/route_rules.py` (existing function)
 
-1. **Where is `NODES` defined?**  
-   - Developer must scan route_rules module, orchestrator node module, graph definition, or node registry
-   - If not found, document the discovery failure and flag for architect review
-   - **DO NOT hardcode a placeholder list** — tests would pass for wrong reasons
+**Signature:** Verified in Step 1, documented in verification-findings.md
 
-2. **Where is the stage agent list defined?**  
-   - Developer must identify which nodes are "stage agents" (nodes that execute work) vs. system nodes (planner, orchestrator, output-validator, flag-review, review)
-   - Likely stage agents: analyst, architect, designer, test_architect
-   - If not centralized, infer from node types or conventions and document in code
+**Contract:** Sole source of routing validity logic. `forced_route` calls it, never duplicates its rules.
 
-3. **Does `broken_rules` return empty list for valid routes?**  
-   - Developer must verify signature and return type before implementing `forced_route`
-   - If returns boolean or raises exceptions, adjust `forced_route` logic accordingly
+---
 
-**Non-blocking (affects test quality):**
+### `NODES` List
 
-4. **What State fields indicate planner/review/execution completion?**  
-   - Tests 1-3 require these fields to construct valid state snapshots
-   - Developer must examine State schema to determine correct fields
+**Module:** `src/agents/nodes/__init__.py` (if exists) or `route_rules.py` (if added)
+
+**Type:** `list[str]`
+
+**Content:** Verified in Steps 2-4, documented in verification-findings.md Step 4
+
+**Contract:**
+
+- Contains all node names used in graph routing (excluding orchestrator)
+- Names match exactly what `broken_rules` expects (verified spelling)
+- Order doesn't matter (used for enumeration only)
+
+---
+
+### `STAGE_AGENTS` Constant
+
+**Module:** `src/agents/nodes/orchestrator/route_rules.py` (to be added)
+
+**Type:** `list[str]`
+
+**Value (from repo tree and Step 3 verification):**
+
+```python
+STAGE_AGENTS = ["compliance", "payroll_calculation", "validation"]
+```
+
+**Contract:**
+
+- Contains names of stage agents that may execute in parallel
+- Names match exactly what `broken_rules` expects
+- Used to enumerate all 2^3 - 1 = 7 non-empty subsets
+
+---
+
+## Edge Cases
+
+### Edge Case 1: No valid candidates (all routes rejected)
+
+**Scenario:** State is in error condition, `broken_rules` rejects all candidates.
+
+**Handling:** `forced_route` returns `None`. Orchestrator (Story 3) calls model.
+
+**Test:** `test_forced_route_no_valid`
+
+---
+
+### Edge Case 2: Multiple stage agents individually valid
+
+**Scenario:** Planner ran, two stage agents unfinished, `broken_rules` accepts both.
+
+**Handling:** `forced_route` returns `None` (multiple valid).
+
+**Test:** `test_forced_route_multiple_valid`
+
+---
+
+### Edge Case 3: Only parallel set valid (if supported)
+
+**Scenario:** `broken_rules` enforces parallel execution of specific agents (verified in Step 1).
+
+**Handling:** `forced_route` returns that set.
+
+**Test:** `test_forced_route_parallel_set` (skip if Step 1 shows this never happens)
+
+---
+
+### Edge Case 4: Terminal marker enumeration
+
+**Scenario:** `"__end__"` is a LangGraph sentinel (confirmed: no `__end__/` directory in repo tree).
+
+**Handling decision (from Step 3/4):**
+
+- **If Step 3/4 decision is YES (enumerate __end__):** Include `"__end__"` in NODES. Test 3 expects `result == ["__end__"]` after all work is complete.
+- **If Step 3/4 decision is NO (don't enumerate __end__):** Exclude `"__end__"` from NODES. `broken_rules` enforces terminal state logic. Test 3 expects `result is None` after all work is complete (orchestrator calls model to route to `__end__`).
+
+**Test:** `test_forced_route_after_completion` (assertion adjusted per Step 3/4 decision)
+
+---
+
+### Edge Case 5: `broken_rules` expects different signature than assumed
+
+**Scenario:** After Step 1 verification, `broken_rules` signature differs from HLD assumptions (e.g., expects single string, not list).
+
+**Handling:** Step 1 verification documents actual signature. Implementation adjusts `forced_route` to match (e.g., call `broken_rules(state, c[0])` for single-node candidates, skip or handle multi-node candidates per Step 1 findings).
+
+**Mitigation:** Step 1 verification prevents runtime discovery. Implementation must not proceed until Step 1 is complete.
 
 ---
 
 ## Implementation Checklist
 
-- [ ] Scan codebase to locate `NODES` constant or registry (BLOCKING)
-- [ ] Identify stage agent list (BLOCKING)
-- [ ] Verify `broken_rules` signature and return type (BLOCKING)
-- [ ] Examine State schema to identify fields for test state construction
-- [ ] Implement `_generate_candidates` helper (individual nodes + agent combinations)
-- [ ] Implement `forced_route` core logic (delegate to `broken_rules`, count valid routes)
-- [ ] Calculate expected candidate count for Test 5 using discovered NODES/STAGE_AGENTS
-- [ ] Write 7 tests with realistic State instances per schema
-- [ ] Replace all placeholder paths in tests with actual paths from codebase scan
-- [ ] Run existing `route_rules` tests, confirm no regressions
-- [ ] Document discovered node lists in code comments if not already centralized
+**BLOCKING PRE-IMPLEMENTATION:**
+
+- [ ] Complete Step 1: Verify `broken_rules` signature, return type, validation convention, parallel route handling
+- [ ] Complete Step 2: Verify `NODES` existence and content in `__init__.py`
+- [ ] Complete Step 3: Verify node names from directory structure, terminal marker handling, output_validator spelling
+- [ ] Complete Step 4: Document final NODES list, __end__ enumeration decision, concrete broken_rules call pattern, concrete test assertions
+- [ ] Read `src/agents/graph/states.py` to determine actual State field names (for test setup)
+- [ ] **BLOCK: Code review rejects PR if verification-findings.md is missing, incomplete, or contains placeholder values**
+
+**Implementation (after verification complete):**
+
+- [ ] Replace all `<VERIFIED_*>` markers in `route_rules.py` implementation with concrete code from Step 4
+- [ ] Add or import `NODES` in `route_rules.py` or `__init__.py` per Step 2/4 decision
+- [ ] Define `STAGE_AGENTS` in `route_rules.py` with verified names
+- [ ] Implement `forced_route` function with verified `broken_rules` call pattern from Step 4
+- [ ] Replace all `<VERIFIED_*>` markers in `tests/test_forced_routing.py` with concrete values from Step 4
+- [ ] Adjust Test 3 assertion to match Step 3/4 __end__ enumeration decision
+- [ ] Skip or adjust Test 5 based on Step 1 parallel route findings
+- [ ] Run `uv run pytest tests/test_forced_routing.py -v`
+- [ ] Verify all tests pass (6 tests, or 5 if Test 5 skipped)
+- [ ] Verify existing tests still pass: `uv run pytest -q`
 
 ---
 
-**End of Story 02-agent LLD**
+## Dependencies
+
+**Depends on:**
+
+- Story 1 (State schema) — `State` class must exist in `src/agents/graph/states.py`
+
+**Blocks:**
+
+- Story 3 (Orchestrator guards) — needs `forced_route` function to call
+
+**Critical path note:** Story 2 can begin verification steps immediately (Steps 1-3 inspect existing code, don't depend on Story 1's new fields). Implementation of `forced_route` code waits for Story 1 merge. Tests can be written during verification (using `<VERIFIED_*>` markers), then finalized after Step 4.
+
+---
+
+## Notes
+
+- **Verification is mandatory.** No exceptions. Code review will reject any PR that contains placeholder code (`<VERIFIED_*>` markers not replaced) or implements based on assumptions instead of verified behavior.
+- **Terminal marker decision must be made in Step 3/4.** Test 3's assertion depends on it. The decision is: "Does `broken_rules` accept `"__end__"` as a valid `next_step` parameter?" Test with a mock call if needed.
+- **Parallel route support must be verified in Step 1.** If `broken_rules` never requires parallel execution of stage agents, Test 5 is skipped. Document the finding.
+- **State schema field names matter for tests.** Tests construct `State` objects. Inspect `states.py` and document the actual field names used to track node results (e.g., `planner_result`, `execution_result`, or other).
+- **Performance is not a concern.** Enumerating ~13 candidates (6 individual nodes + 7 stage subsets, if `__end__` excluded) and calling `broken_rules` 13 times is negligible vs. a 1-2 second model call.
+- **`output_validator` spelling verified from repo tree:** underscore format confirmed (`output_validator/` directory exists, no `output

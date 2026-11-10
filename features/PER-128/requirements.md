@@ -1,196 +1,170 @@
-# requirements.md
+# PER-128 — Requirements
+
+**Type:** story  
+**Epic:** (none — standalone feature)  
+**Covers:** (direct from ticket)
+
+---
 
 ## Overview
 
-This document formalizes the acceptance criteria for PER-128, which adds forced routing and per-run token usage tracking to reduce orchestrator model calls.
+Add usage telemetry aggregated per run and per node, and skip orchestrator model calls when the graph has only one valid route, to reduce token spend on deterministic decisions.
 
 ---
 
-## Given/When/Then Acceptance Criteria
+## Requirements
 
-### AC1: Token usage tracking per run
+### R1: Token usage accumulation per run
 
-**AC1.1: Record usage per call**
+**Given** a run is in progress  
+**When** any node makes a model call (via `run_skill`, MCP tool loop in `bindings.py`, or `ModelGateway.complete`)  
+**Then** the call's `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, and `cache_read_input_tokens` are recorded to `State.usage[node_name]`, accumulating counts across all calls that node makes.
 
-**Given** a run is executing  
-**When** any model call completes (including `run_skill`, MCP tool rounds in `bindings.py`, JSON retries, and `ModelGateway.complete`)  
-**Then** the call's `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, and `cache_read_input_tokens` are recorded in `State.usage` under the current node's key
-
-**AC1.2: Accumulate usage per node**
-
-**Given** multiple calls occur for the same node  
-**When** usage is updated  
-**Then** the new counts are added to the node's existing counts (not replaced)
-
-**AC1.3: State migration for old runs**
-
-**Given** a run was saved before this change (no `usage` field)  
+**Given** a run saved before `State.usage` existed  
 **When** the run is loaded and resumed  
-**Then** it loads successfully and continues execution without error
+**Then** the run continues without error, and `State.usage` initializes as empty for that run.
 
-**AC1.4: Log usage at run end**
-
-**Given** a run completes or pauses  
-**When** `run_query` in `runner.py` finishes  
-**Then** the total usage across all nodes is logged
-
-**AC1.5: API returns usage totals**
-
-**Given** a client queries `GET /runs/{thread_id}`  
-**When** the response is returned  
-**Then** `values` includes the run's total token usage
+**Given** a run has ended or paused  
+**When** `run_query` completes  
+**Then** the total token counts (summed across all nodes) are logged, and `GET /runs/{thread_id}` returns them in the response `values`.
 
 ---
 
-### AC2: Forced routing logic
+### R2: Forced route selection
 
-**AC2.1: Return forced route when exactly one candidate passes**
-
-**Given** the orchestrator is at a decision point  
+**Given** the orchestrator is deciding the next route  
 **When** `forced_route(state)` is called  
-**Then** it returns a single-element list `[route]` if exactly one candidate route passes `broken_rules`, or `None` if zero or multiple candidates pass
+**Then** it returns a single-element route list if exactly one candidate route passes `broken_rules`, otherwise `None`.
 
-**AC2.2: Pre-planner forced route**
+**Given** `forced_route` needs to determine valid candidates  
+**When** evaluating possible routes  
+**Then** candidates include each node individually (from `NODES` list in `src/agents/nodes/__init__.py`, or derived from `src/agents/nodes/` directory structure: `planner`, `compliance`, `payroll_calculation`, `validation`, `execution`, `output_validator`, `orchestrator`), plus every non-empty set of stage agents (`compliance`, `payroll_calculation`, `validation`), and `broken_rules` (in `src/agents/nodes/orchestrator/route_rules.py`) remains the sole source of routing validity logic (no duplication in `forced_route`).
 
-**Given** the system state before the planner has run  
+---
+
+### R3: Orchestrator behavior on forced routes
+
+**Given** `forced_route(state)` returns a route and the orchestrator has no model work to do  
+**When** the orchestrator decides the next step  
+**Then** it skips the model call and uses the forced route directly, recording a step with title `Next: <route>`, result `"forced: only one valid route"`, and `attempts: 0` in evidence.
+
+**Given** `forced_route(state)` returns a route but the model still has work  
+**When** pause conditions are detected (via `interrupt_before` in `src/agents/graph/interrupts.py`—no separate pause route nodes exist per `src/agents/nodes/` directory tree), OR an unresolved flag exists whose ID is not in `orchestrator_seen_flag_ids`  
+**Then** the model call proceeds as usual, and the route is not forced.
+
+**Given** the orchestrator receives control with flags present in state  
+**When** it processes that hop  
+**Then** the flag IDs from the state's flag field are recorded in `State.orchestrator_seen_flag_ids` (set of strings), to prevent duplicate model work on the same flags.
+
+**Given** a forced hop completes  
+**When** the orchestrator updates state  
+**Then** `status`, `flagged`, `priority`, and `confidence` are updated exactly as a model hop would, and `summary` remains unchanged.
+
+---
+
+## Acceptance Criteria
+
+### AC1: Forced route logic (6 tests)
+
+**Given** the planner has not yet run  
 **When** `forced_route(state)` is called  
-**Then** it returns `["planner"]`
-
-**AC2.3: Post-review forced route**
-
-**Given** the system state after a review hop  
-**When** `forced_route(state)` is called  
-**Then** it returns `["__end__"]`
-
-**AC2.4: Post-execution forced route**
+**Then** it returns `["planner"]`.
 
 **Given** execution has finished  
 **When** `forced_route(state)` is called  
-**Then** it returns `["output-validator"]`
+**Then** it returns `["output_validator"]` (node name format verified from `src/agents/nodes/output_validator/`).
 
-**AC2.5: Multiple valid routes**
-
-**Given** two stage agents are both unfinished and nothing is waiting  
+**Given** the graph has reached terminal state  
 **When** `forced_route(state)` is called  
-**Then** it returns `None`
+**Then** it returns `["__end__"]` (LangGraph's terminal sentinel, verified from `src/agents/graph/build.py` edge logic).
 
-**AC2.6: Delegate to broken_rules**
+**Given** two stage agents are unfinished and no flags or pauses are waiting  
+**When** `forced_route(state)` is called  
+**Then** it returns `None` (multiple valid candidates).
 
-**Given** candidate routes are generated  
-**When** `forced_route` checks them  
-**Then** it uses `broken_rules` as the sole source of routing rules (no duplication)
+**Given** only a parallel set of stage agents is valid (e.g., compliance and validation together, both individually rejected by `broken_rules`)  
+**When** `forced_route(state)` is called  
+**Then** it returns the parallel set (e.g., `["compliance", "validation"]`) if `broken_rules` enforces parallel execution, OR returns `None` if `broken_rules` never requires parallel execution.
 
----
-
-### AC3: Orchestrator integration
-
-**AC3.1: Skip model call when forced route and no model work needed**
-
-**Given** the orchestrator is at a hop and `forced_route` returns a route  
-**When** the route does NOT pause for a person (`flag-review` or `review`) AND no unresolved flag exists that the orchestrator's model has not seen  
-**Then** the orchestrator skips `_decide` and uses the forced route without calling the model
-
-**AC3.2: Forced hop step structure**
-
-**Given** a forced hop is taken  
-**When** the step is recorded  
-**Then** it has title `Next: <route>`, result `"forced: only one valid route"`, evidence `attempts: 0`, and updates `status`, `flagged`, `priority`, and `confidence` as a model hop would, leaving `summary` unchanged
-
-**AC3.3: Model called for reviewer summary**
-
-**Given** the orchestrator is at a hop and `forced_route` returns `["flag-review"]` or `["review"]`  
-**When** the model must write the reviewer's `summary`  
-**Then** the orchestrator calls the model even though the route is forced
-
-**AC3.4: Model called for unseen flags**
-
-**Given** an unresolved flag exists  
-**When** the flag's id is NOT in the set of flags the orchestrator's model has seen  
-**Then** the orchestrator calls the model to merge or address the flag, even if the route is forced
-
-**AC3.5: Track seen flags**
-
-**Given** the orchestrator's model sees a brief containing flags  
-**When** the model call completes  
-**Then** the flag ids from that brief are added to the state's set of seen flags
+**Given** all candidates are rejected by `broken_rules` (invalid state)  
+**When** `forced_route(state)` is called  
+**Then** it returns `None`.
 
 ---
 
-### AC4: Automated test coverage
+### AC2: Orchestrator model call skipping (6 tests)
 
-**AC4.1: All new tests pass**
-
-**Given** the test suite includes new tests with a fake gateway and no live services  
-**When** `uv run pytest -q` is executed  
-**Then** all tests pass
-
-**AC4.2: Tests verify forced_route deterministic routes**
-
-**Given** a test scenario where `forced_route` should return a deterministic route  
-**When** the state matches pre-planner, post-review, or post-execution conditions  
-**Then** the test asserts the expected forced route (`["planner"]`, `["__end__"]`, or `["output-validator"]`)
-
-**AC4.3: Tests verify forced_route with multiple valid routes**
-
-**Given** a test scenario where multiple routes are valid  
-**When** `forced_route` is called  
-**Then** the test asserts it returns `None`
-
-**AC4.4: Tests verify no model call on forced hops**
-
-**Given** a test scenario where a forced hop occurs  
+**Given** `forced_route(state)` returns a route and no model work is required (not a pause condition, and no unseen flags)  
 **When** the orchestrator processes the hop  
-**Then** the test asserts no model call was made (via gateway spy/mock)
+**Then** no model call is made, and a step is recorded with `result: "forced: only one valid route"` and `attempts: 0`.
 
-**AC4.5: Tests verify model called when needed**
-
-**Given** a test scenario where the forced route requires model work (pause or unseen flag)  
+**Given** `forced_route(state)` returns a route but pause conditions are detected (via `interrupt_before` in `src/agents/graph/interrupts.py`)  
 **When** the orchestrator processes the hop  
-**Then** the test asserts the model was called
+**Then** the model is called to generate the reviewer's `summary` before pausing.
 
-**AC4.6: Tests verify forced hop step structure**
+**Given** `forced_route(state)` returns a route but an unresolved flag exists whose ID is not in `State.orchestrator_seen_flag_ids`  
+**When** the orchestrator decides the next route  
+**Then** the model is called to handle flag merging.
 
-**Given** a test scenario where a forced hop is recorded  
+**Given** the orchestrator receives control with flags in state  
+**When** the hop is processed  
+**Then** the flag IDs are extracted and added to `State.orchestrator_seen_flag_ids` before any decision logic runs.
+
+**Given** a forced hop completes  
 **When** the step is written  
-**Then** the test asserts `status`, `priority`, `confidence`, and step structure match expectations
+**Then** the step's title is `Next: <route>`, and `status`, `priority`, `confidence`, and `flagged` match what a model hop would produce for the same route, and `summary` is unchanged.
 
-**AC4.7: Tests verify usage accumulation**
-
-**Given** a test scenario where multiple model calls occur for a node  
-**When** usage is recorded  
-**Then** the test asserts counts accumulate correctly across calls
-
-**AC4.8: Tests verify state migration**
-
-**Given** a test scenario where a run is loaded without a `usage` field  
-**When** the run resumes  
-**Then** the test asserts it continues without error
-
-**AC4.9: Existing tests pass unchanged**
-
-**Given** existing tests that cover current orchestrator and state behavior  
-**When** `uv run pytest -q` is executed after the changes  
-**Then** all existing tests pass unchanged
+**Given** a forced hop completes  
+**When** the step is recorded  
+**Then** the step's evidence includes `attempts: 0` and any other evidence fields that a normal model hop would include.
 
 ---
 
-### AC5: Demonstrable savings
+### AC3: Usage tracking and aggregation (7 tests)
 
-**AC5.1: PR description includes before/after metrics**
+**Given** `State.usage` reducer receives updates for the same node across multiple calls  
+**When** the reducer processes them  
+**Then** counts for `calls`, `input_tokens`, `output_tokens`, `cache_creation_input_tokens`, and `cache_read_input_tokens` sum into existing counts for that node, and missing keys initialize to zero.
 
-**Given** the PR description includes before/after measurements  
-**When** one service order is run (e.g. SO-1003 via `run_so.py`)  
-**Then** the description reports model call count and total token usage before the change, and the same metrics after the change
+**Given** `State.orchestrator_seen_flag_ids` reducer receives sets of flag IDs  
+**When** the reducer processes them  
+**Then** incoming sets union into the existing set.
+
+**Given** a checkpoint saved before `State.usage` and `State.orchestrator_seen_flag_ids` existed  
+**When** the checkpoint is loaded  
+**Then** the run resumes without error, and both fields initialize as empty (empty dict and empty set respectively).
+
+**Given** a checkpoint with existing `State.usage` and `State.orchestrator_seen_flag_ids`  
+**When** the checkpoint is loaded  
+**Then** existing counts and seen flag IDs are preserved.
+
+**Given** a node makes multiple model calls including JSON retries (in `run_skill` from `src/agents/skills/client.py`) and MCP tool rounds (in `src/agents/tools/bindings.py`)  
+**When** usage is aggregated  
+**Then** `State.usage[node_name]` contains the sum of all calls' counts.
+
+**Given** a run ends (next step is `["__end__"]`) or pauses (detected by `next` being empty and `status != "complete"`, or by `interrupted` flag, per `src/agents/runtime/runner.py` logic)  
+**When** `run_query` completes  
+**Then** it logs total token counts summed across all nodes.
+
+**Given** a client requests run state via `GET /runs/{thread_id}` (endpoint in `src/agents/runtime/backend.py` or `src/agents/runtime/server.py`)  
+**When** the response is returned  
+**Then** `values.usage` includes per-node counts matching `State.usage`.
 
 ---
 
-## Test Count by Story
+### AC4: Test coverage
 
-- **Story 1 (PER-128-1):** 5 tests covering AC1.1, AC1.2, AC1.3, AC4.7, AC4.8
-- **Story 2 (PER-128-2):** 7 tests covering AC2.1, AC2.2, AC2.3, AC2.4, AC2.5, AC2.6, AC4.2, AC4.3
-- **Story 3 (PER-128-3):** 10 tests covering AC3.1, AC3.2, AC3.3, AC3.4, AC3.5, AC1.4, AC1.5, AC4.1, AC4.4, AC4.5, AC4.6, AC4.9, AC5.1
+**Given** the new logic is implemented  
+**When** tests are run  
+**Then** all new tests covering AC1 (6 tests), AC2 (6 tests), and AC3 (7 tests) pass with a fake gateway (no live services), existing tests in `tests/test_backend.py` and `tests/test_evaluate.py` pass unchanged, and `uv run pytest -q` completes successfully.
 
-**Total:** 22 new tests (matches breakdown.md Verification Summary)
+---
+
+### AC5: PR evidence
+
+**Given** the PR is opened  
+**When** the description is reviewed  
+**Then** it includes before-and-after counts of model calls and total tokens for one service order (e.g., `run_so.py` with SO-1003 or equivalent), showing measurable savings.
 
 ---
 
@@ -198,5 +172,35 @@ This document formalizes the acceptance criteria for PER-128, which adds forced 
 
 - Changing models, `policy.yaml` limits, skill or prompt content
 - Shrinking `_brief`, or removing the skill container and code-execution tool from orchestrator calls
-- The MCP server, the GraphQL service, and fastapi-backend
-- Graph routing rules themselves: `broken_rules` behaves as today
+- The MCP server, GraphQL service, or fastapi-backend
+- Graph routing rules themselves (`broken_rules` behavior in `src/agents/nodes/orchestrator/route_rules.py` remains unchanged)
+
+---
+
+## Verification
+
+Run the new test suite (19 new tests total: 6 for AC1, 6 for AC2, 7 for AC3) with a fake model gateway and no live services. Verify all tests pass, existing tests in `tests/test_backend.py` and `tests/test_evaluate.py` remain unchanged, and `uv run pytest -q` passes. Confirm the PR description includes measured token savings from a representative service order.
+
+---
+
+## Notes
+
+- `State.usage` schema: `{node: {calls, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens}}` with a reducer that sums new counts into existing ones (Story 1).
+- `State.orchestrator_seen_flag_ids` schema: `set[str]` with a union reducer (Story 1).
+- `forced_route` must not duplicate routing logic; it delegates all validity checks to `broken_rules` (in `src/agents/nodes/orchestrator/route_rules.py`). Story 2 verifies the exact signature and return type of `broken_rules` before implementing `forced_route`.
+- Track which flags the orchestrator has seen in `State.orchestrator_seen_flag_ids` to avoid redundant model calls for flag merging (Story 3).
+- Pause detection: No separate pause route nodes exist per `src/agents/nodes/` directory. Pause logic is handled via `interrupt_before` in `src/agents/graph/interrupts.py`. Story 3 verifies the actual pause detection mechanism before implementing Guard 1 in the orchestrator.
+- Terminal node: `["__end__"]` is LangGraph's terminal sentinel (not a real node directory). Story 2 includes it in the enumerated candidates for `forced_route` if `broken_rules` accepts sentinel values.
+- **All calling nodes of `run_skill` must be identified and updated** when `run_skill`'s return type changes to `tuple[dict, dict]` in Story 4. This includes at minimum: `planner`, `orchestrator`, and any stage agents that call skills. The list is verified by searching `src/agents/nodes/` for `run_skill` calls before implementing Story 4.
+- **Story verification responsibilities (no cross-story verification assumptions):**
+  - **Story 1** verifies and documents actual flag field name and dict structure in `src/agents/graph/states.py` (may be `flags`, `open_flags`, or other; flag dicts may have `id`/`flag_id` and `resolved`/`is_resolved` or other keys). Produces `verification-findings.md` with concrete schema.
+  - **Story 2** verifies exact signature and return type of `broken_rules` in `src/agents/nodes/orchestrator/route_rules.py` (what it accepts for `next_step`, what it returns). Verifies actual node names from `src/agents/nodes/` directory (planner, compliance, payroll_calculation, validation, execution, output_validator, orchestrator). Verifies whether `NODES` list exists in `src/agents/nodes/__init__.py`, and derives it from directory names if not. Verifies correct node name format (underscores vs hyphens: `output_validator` not `output-validator`). Verifies terminal sentinel handling from `src/agents/graph/build.py`. Verifies pause mechanism from `src/agents/graph/interrupts.py`. Produces `verification-findings.md` with concrete findings.
+  - **Story 3** reads Story 1's `verification-findings.md` for flag schema, reads Story 2's `verification-findings.md` for pause mechanism. Verifies orchestrator function structure in `src/agents/nodes/orchestrator/node.py` (main function name, model decision function signature, step structure, state field update pattern). Produces `verification-findings.md` with concrete findings.
+  - **Story 4** verifies current signature and return type of `run_skill` in `src/agents/skills/client.py` (sync vs async, current return type). Verifies all nodes that call `run_skill` (searches `src/agents/nodes/` for imports/calls). Verifies response object structure from `ModelGateway.complete` in `src/agents/model/gateway.py` (how to access `usage` metadata: `response.usage.input_tokens` or other). Produces `verification-findings.md` listing all calling nodes.
+  - **Story 5** verifies Story 4's implementations do NOT pass `node_name` to `ModelGateway.complete`. Verifies current signature of `ModelGateway.complete` method. Produces `verification-findings.md` confirming non-interference.
+  - **Story 6** verifies run end/pause detection in `src/agents/runtime/runner.py` (how `run_query` identifies completion vs pause: `next == ["__end__"]`, `interrupted` flag, or other). Verifies API endpoint location (`src/agents/runtime/backend.py` or `server.py`) and response structure (whether `values` includes all state fields or is filtered). Produces `verification-findings.md` with concrete findings.
+
+---
+
+**Dependencies:** None  
+**Blocks:** None

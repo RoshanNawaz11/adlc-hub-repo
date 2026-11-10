@@ -1,843 +1,842 @@
-# Story 03-agent LLD
+# LLD — Story 03-agent: Orchestrator decision guards and forced hops
 
-**Ticket:** PER-128-3  
-**Epic:** PER-128  
-**Repo:** agent  
-**Title:** Integrate forced routing into orchestrator node
+**Story:** Orchestrator decision guards and forced hops  
+**Epic:** PER-128 (Skip orchestrator model calls on deterministic hops and track token usage)  
+**Repo:** `agent`  
+**Version:** 1.2  
+**Status:** Draft
+
+---
+
+## Overview
+
+Modify the orchestrator (`src/agents/nodes/orchestrator/node.py`) to skip model calls when the graph has only one valid route and the model has no other work to do. Before calling the model decision function, extract flag IDs from the current state and update `State.orchestrator_seen_flag_ids`, then call `forced_route(state)` (from Story 2) to check if a route is deterministic.
+
+**Model work guards:** The orchestrator still calls the model when:
+
+1. **Guard 1 (Pause detection):** Pause is required (detected by checking state conditions verified from `src/agents/graph/interrupts.py`, NOT by routing to a pause node—no separate pause nodes exist per repo tree).
+2. **Guard 2 (Unseen flags):** An unresolved flag exists whose ID is not in `State.orchestrator_seen_flag_ids` (model must merge duplicate flags).
+
+**Forced hops:** When no model work is required, skip the model decision function and write a step with:
+
+- `title: "Next: {route}"`
+- `result: "forced: only one valid route"`
+- `evidence: {attempts: 0}`
+- `status`, `flagged`, `priority`, `confidence` updated as a model hop would
+- `summary` unchanged
+
+This story integrates Stories 1 (State schema) and 2 (forced_route logic) into the orchestrator's decision flow.
+
+**CRITICAL VERIFICATION MANDATE:** Before implementing ANY code, the developer MUST complete the Verification Checklist below and document ALL findings in `stories/03-agent/verification-findings.md`. The implementation sketches in this LLD are PLACEHOLDERS ONLY—they will be adjusted to match verified behavior. NO CODE may be written until verification is complete and documented.
 
 ---
 
 ## Acceptance Criteria
 
-From `requirements.md` AC3, AC4, AC5 (this story's scope):
+### AC1: Orchestrator skips model decision function on forced hop when no model work required
 
-1. **AC3.1:** When `forced_route` returns a route and no model work is needed, the orchestrator skips `_decide` and uses the forced route without calling the model.
-2. **AC3.2:** A forced hop records a step with title `Next: <route>`, result `"forced: only one valid route"`, evidence `attempts: 0`, and updates `status`, `flagged`, `priority`, `confidence` as a model hop would, leaving `summary` unchanged.
-3. **AC3.3:** When the forced route is `["flag-review"]` or `["review"]`, the orchestrator calls the model (to write reviewer summary).
-4. **AC3.4:** When an unresolved flag exists whose ID is not in `state.seen_flags`, the orchestrator calls the model (to merge/address the flag).
-5. **AC3.5:** After every model call, the orchestrator extracts flag IDs from the brief and adds them to `state.seen_flags`.
-6. **AC4.1:** New tests verify the orchestrator makes no model call on forced hops (via gateway mock).
-7. **AC4.2:** New tests verify the model is called when forced route requires reviewer summary or unseen flag handling.
-8. **AC4.3:** New tests verify forced hop step structure matches expected format.
-9. **AC4.4:** New tests verify `usage` accumulates correctly across calls, including runs without prior `usage` field.
-10. **AC4.5:** All existing tests pass unchanged (`uv run pytest -q`).
-11. **AC5.1:** PR description reports before/after metrics (model calls, tokens) for one service order.
+**Given** `forced_route(state)` returns a route  
+**And** pause is not required (using verified pause detection mechanism from `src/agents/graph/interrupts.py`)  
+**And** no unresolved flag exists whose ID is missing from `State.orchestrator_seen_flag_ids` (using verified flag schema from `src/agents/graph/states.py`)  
+**When** the orchestrator processes the hop  
+**Then** the model decision function (verified name from `src/agents/nodes/orchestrator/node.py`) is not called, and a forced hop step is written with `attempts: 0`.
 
 ---
 
-## HLD Outcomes (Binding Constraints)
+### AC2: Forced hop step format
 
-From `hld.md`:
+**Given** a forced hop completes  
+**When** the step is written  
+**Then** the step has (using verified step structure from `src/agents/nodes/orchestrator/node.py`):
 
-- **AD-1 (State schema extensions):** `State` gains `usage: Dict[str, UsageStats]` (from Story 1) and `seen_flags: Set[str]`. The `seen_flags` reducer unions incoming IDs with existing ones. Missing `seen_flags` in old runs treated as `set()`.
-- **AD-2 (forced_route contract):** Returns `list[str]` when exactly one candidate passes `broken_rules`, else `None` (from Story 2).
-- **AD-3 (Orchestrator skip conditions):** Skip `_decide` when `forced_route` returns a route, UNLESS: (1) route is `["flag-review"]` or `["review"]`, or (2) unresolved flag exists with ID not in `state.seen_flags`.
-- **AD-4 (Usage recording contract):** All model call sites record token counts (from Story 1). This story adds orchestrator's contribution.
-- **AD-5 (Runtime aggregation and logging):** `run_query` sums `state.usage` across nodes and logs totals at run end/pause. `GET /runs/{thread_id}` returns totals in `values`.
+- `title: "Next: {route}"` (e.g., `"Next: ['planner']"`)
+- `result: "forced: only one valid route"`
+- `evidence: {attempts: 0, ...}` (plus any other evidence fields a normal hop includes, verified from existing step structure)
+
+---
+
+### AC3: Forced hop state updates
+
+**Given** a forced hop completes  
+**When** state is updated  
+**Then** `status`, `flagged`, `priority`, and `confidence` are updated exactly as a model hop would (using verified field names and update pattern from `src/agents/nodes/orchestrator/node.py`), and `summary` remains unchanged.
+
+---
+
+### AC4: Model call proceeds when pause is required
+
+**Given** `forced_route(state)` returns a route  
+**And** pause is required (detected by verified pause mechanism from `src/agents/graph/interrupts.py`—NOT by checking route names, as no separate pause nodes exist)  
+**When** the orchestrator processes the hop  
+**Then** the model decision function is called (model must write `summary` before pause).
+
+---
+
+### AC5: Model call proceeds on unseen flags
+
+**Given** `forced_route(state)` returns a route  
+**And** an unresolved flag exists whose ID is not in `State.orchestrator_seen_flag_ids` (using verified flag schema from `src/agents/graph/states.py`)  
+**When** the orchestrator processes the hop  
+**Then** the model decision function is called (model must merge flags).
+
+---
+
+### AC6: `orchestrator_seen_flag_ids` updated before decision
+
+**Given** the orchestrator receives control with flags present in state  
+**When** the orchestrator processes the hop  
+**Then** the flag IDs are extracted (using verified flag schema from `src/agents/graph/states.py`) and added to `State.orchestrator_seen_flag_ids` before any decision logic runs.
+
+---
+
+## Verification Checklist (MANDATORY BLOCKING GATE)
+
+**NO CODE MAY BE WRITTEN UNTIL THIS CHECKLIST IS COMPLETE AND DOCUMENTED IN `stories/03-agent/verification-findings.md`.**
+
+### Step 1: Verify flag schema in `State`
+
+**Tasks:**
+
+- [ ] Read `src/agents/graph/states.py` (full file or search for class `State`)
+- [ ] Document actual flag field name (search for "flag" in the file—is it `flags`, `open_flags`, `active_flags`, `flagged`, other?)
+- [ ] Document flag dict schema if flags are a list: what keys exist? (e.g., `id`/`flag_id`, `resolved`/`is_resolved`, `message`, other?)
+- [ ] Document flag storage type: list of dicts? dict keyed by ID? other?
+- [ ] Provide example flag from code or docstring
+
+**Required findings in `verification-findings.md`:**
+
+```markdown
+## Step 1: Flag Schema from states.py
+
+**File inspected:** `src/agents/graph/states.py` (lines X-Y)
+
+**Flag field name:** state.<verified_name> (e.g., `state.flags`, `state.open_flags`, etc.)
+
+**Flag storage type:** (list[dict] / dict[str, dict] / other)
+
+**If list[dict], flag dict structure:**
+```python
+{
+  "<verified_id_field>": str,  # e.g., "id" or "flag_id"
+  "<verified_resolved_field>": bool,  # e.g., "resolved" or "is_resolved"
+  # Other keys found: message, source, etc.
+}
+```
+
+**Example flag from code/docstring:**
+```python
+{"id": "flag_abc", "resolved": False, "message": "...", "source": "compliance"}
+# OR different structure if found
+```
+
+**How to check if a flag is unresolved:**
+```python
+# e.g., flag["resolved"] == False
+# OR:  flag.get("is_resolved", True) == False
+# OR:  other pattern found in code
+```
+```
+
+---
+
+### Step 2: Verify pause detection mechanism
+
+**Tasks:**
+
+- [ ] Search `src/agents/nodes/` directory for any directories named `review`, `flag-review`, `human_review`, or similar (confirm they do NOT exist per repo tree)
+- [ ] Read `src/agents/graph/interrupts.py` (full file or search for `interrupt_before`)
+- [ ] Document how pause is triggered (interrupt condition in graph builder? state flag checked by orchestrator? other?)
+- [ ] Document what state condition triggers pause (e.g., `state.needs_review`, `state.flagged`, presence of unresolved flags, other)
+- [ ] Confirm whether pause is orthogonal to routing (pause happens via interrupt, not by routing to a pause node)
+
+**Required findings in `verification-findings.md`:**
+
+```markdown
+## Step 2: Pause Detection Mechanism
+
+**Directories searched:** `src/agents/nodes/` (confirmed no `review/`, `flag-review/`, etc.)
+
+**Pause route nodes exist?** NO (per repo tree and directory search)
+
+**File inspected:** `src/agents/graph/interrupts.py` (lines X-Y)
+
+**Pause mechanism:**
+- Triggered by: (interrupt_before condition / state flag / other)
+- Condition code location: (show relevant code snippet from interrupts.py or build.py)
+- Example condition: (e.g., `interrupt_before=lambda state: state.get("flagged", False)`)
+
+**State field/condition that triggers pause:**
+```python
+# e.g., state.flagged == True
+# OR:  len(state.open_flags) > 0
+# OR:  state.needs_review == True
+# OR:  other verified condition
+```
+
+**Conclusion:** Pause is (interrupt-based / routing-based). Guard 1 will check (state condition / route name).
+```
+
+---
+
+### Step 3: Verify orchestrator function structure
+
+**Tasks:**
+
+- [ ] Read `src/agents/nodes/orchestrator/node.py` (search for main function and model decision function)
+- [ ] Document the main orchestrator function name (is it `run`, `decide`, `orchestrator_node`, other?)
+- [ ] Document the model decision function name and signature (is it `_decide`, `decide_route`, other? what does it return?)
+- [ ] Document step creation pattern: where are steps written? what dict structure?
+- [ ] Document state field update pattern: how are `status`, `priority`, `confidence`, `flagged`, `summary` updated? (show code snippet)
+- [ ] Document evidence structure: what keys exist in evidence dict?
+
+**Required findings in `verification-findings.md`:**
+
+```markdown
+## Step 3: Orchestrator Structure from node.py
+
+**File inspected:** `src/agents/nodes/orchestrator/node.py` (lines X-Y)
+
+**Main orchestrator function:**
+```python
+def <verified_name>(state: State) -> dict:  # e.g., orchestrator_node
+    # Show function signature line
+```
+
+**Model decision function:**
+```python
+def <verified_name>(state: State) -> dict:  # e.g., _decide
+    # Show function signature line
+```
+
+**Model decision function returns:**
+```python
+{
+  "steps": [...],  # list of step dicts
+  "next": [...],   # list of node names
+  "status": str,
+  "summary": str,
+  # Other fields found
+}
+```
+
+**Step structure (show example from code):**
+```python
+{
+  "title": str,
+  "result": str,
+  "evidence": {
+    "attempts": int,
+    # Other evidence keys found
+  },
+  # Other step fields: timestamp, etc.
+}
+```
+
+**State field update pattern (show code snippet):**
+```python
+# How status, priority, confidence, flagged, summary are computed/updated
+# e.g., return {"status": _compute_status(...), "priority": ..., ...}
+```
+```
+
+---
+
+### Step 4: Verify state update pattern
+
+**Tasks:**
+
+- [ ] Confirm how LangGraph nodes return state updates in this codebase (dict with updated fields? other?)
+- [ ] Document field names for `next`, `status`, `summary`, `steps`, `priority`, `confidence`, `flagged`
+- [ ] Verify how `steps` field accumulates (list append each hop? single step overwrite? other?)
+- [ ] Verify `summary` behavior (overwrite? append? other?)
+
+**Required findings in `verification-findings.md`:**
+
+```markdown
+## Step 4: State Update Pattern
+
+**State update return type:** (dict with updated fields / other)
+
+**Field names verified:**
+- next: (list[str] / other)
+- status: (str / other)
+- summary: (str / other)
+- steps: (list[dict] / other)
+- priority: (str / other)
+- confidence: (str / other)
+- flagged: (bool / other)
+
+**Steps field behavior:**
+```python
+# Append each hop: return {"steps": [new_step]} and reducer appends
+# OR: Single step overwrite: return {"steps": new_step}
+# OR: other pattern observed
+```
+
+**Summary field behavior:**
+```python
+# Overwrite: return {"summary": "new summary"}
+# OR: Append: reducer appends to existing
+# OR: other pattern
+```
+```
+
+---
+
+### Step 5: Document findings and adjust implementation plan
+
+**Tasks:**
+
+- [ ] Create `stories/03-agent/verification-findings.md` with all findings from Steps 1-4 documented
+- [ ] Based on findings, write adjusted implementation notes:
+  - Actual flag field name and ID extraction pattern
+  - Actual pause detection pattern (state condition check, not route matching)
+  - Actual model decision function name
+  - Actual step structure and state update pattern
+- [ ] List any blocking issues (e.g., if flag schema cannot support unique IDs, Guard 2 cannot be implemented as designed)
+
+**Required section in `verification-findings.md`:**
+
+```markdown
+## Step 5: Implementation Adjustments
+
+**Flag extraction pattern (adjusted from Step 1):**
+```python
+current_flags = state.<verified_flag_field_name>
+flag_ids = {flag.get("<verified_id_field>") for flag in current_flags if "<verified_id_field>" in flag}
+```
+
+**Unresolved flag check (adjusted from Step 1):**
+```python
+unresolved_flags = [f for f in current_flags if not f.get("<verified_resolved_field>")]
+```
+
+**Pause detection (adjusted from Step 2):**
+```python
+# Guard 1 checks:
+if <verified_pause_condition>:
+    # e.g., if state.flagged or len(state.open_flags) > 0
+    # Call model decision function for summary
+```
+
+**Model decision function call (adjusted from Step 3):**
+```python
+decide_result = <verified_function_name>(state)
+# e.g., _decide(state)
+```
+
+**Forced hop step creation (adjusted from Step 3):**
+```python
+step = {
+    "title": f"Next: {route}",
+    "result": "forced: only one valid route",
+    "evidence": {
+        "attempts": 0,
+        # Other verified evidence fields
+    },
+    # Other verified step fields
+}
+```
+
+**State update return (adjusted from Step 4):**
+```python
+return {
+    "steps": [step],  # or other verified pattern
+    "next": route,
+    "status": <computed>,
+    "flagged": <computed>,
+    "priority": <computed>,
+    "confidence": <computed>,
+    "summary": state.<verified_summary_field>  # unchanged
+}
+```
+
+**Blocking issues:** (none / list any issues that prevent implementation as designed)
+```
+
+---
+
+**BLOCKING RULE:** The developer MUST NOT proceed to File Plan or Implementation until `verification-findings.md` exists with all five steps completed. Code review WILL REJECT any PR that skips verification or uses placeholder values from this LLD.
 
 ---
 
 ## File Plan
 
-**CRITICAL:** Repo tree not mapped. Developer MUST locate actual file paths by scanning the agent codebase before implementation. All paths below are placeholders derived from ticket context and will fail if used directly.
+### Modified Files
 
-### Files to Create
+#### `src/agents/nodes/orchestrator/node.py`
 
-1. **Test file for orchestrator forced routing (path TBD from codebase scan)**
-   - Purpose: Test orchestrator's forced routing integration
-   - Content: 6 tests per Verification Approach below
-   - Placeholder name: `tests/agents/nodes/test_orchestrator_forced_routing.py`
+**Current state (from repo tree):**
 
-2. **Test file for usage tracking integration (path TBD from codebase scan)**
-   - Purpose: Integration tests for usage aggregation and API response
-   - Content: 4 tests per Verification Approach below
-   - Placeholder name: `tests/agents/integration/test_usage_tracking.py`
+- File exists.
+- Contains orchestrator node logic.
+- Calls a model decision function.
+- Writes steps to state.
 
-### Files to Modify
+**Changes (ALL field names, function names, and conditions below are PLACEHOLDERS—replace with verified values from `verification-findings.md`):**
 
-3. **State schema module (path TBD from codebase scan)**
-   - Add `seen_flags: Set[str]` field to `State` schema
-   - Implement union reducer: `_reduce_seen_flags(existing, delta) -> Set[str]`
-   - Placeholder path: `src/agents/state.py`
+1. **Import `forced_route`:**
 
-4. **State loader module (path TBD from codebase scan)**
-   - Handle missing `seen_flags` field by initializing to `set()` when loading old runs
-   - Placeholder path: `src/agents/state_loader.py`
+   ```python
+   from src.agents.nodes.orchestrator.route_rules import forced_route
+   ```
 
-5. **Orchestrator node module (path TBD from codebase scan)**
-   - Import `forced_route` from route_rules module
-   - At each decision point, call `forced_route(state)`
-   - Implement skip logic (two exceptions per AD-3)
-   - Record forced hop step (title, result, evidence, status updates)
-   - Extract flag IDs from brief after model calls
-   - Update `state.seen_flags` via reducer
-   - Placeholder path: `src/agents/nodes/orchestrator/node.py`
+2. **Extract flag IDs before decision:**
 
-6. **Runtime query handler module (path TBD from codebase scan)**
-   - In `run_query`: aggregate `state.usage` across nodes
-   - Log totals at run end/pause
-   - Placeholder path: `src/agents/runtime/runner.py`
+   ```python
+   # VERIFIED VALUES REQUIRED FROM Step 1:
+   current_flags = state.<verified_flag_field_name>
+   flag_ids = {flag.get("<verified_id_field>") for flag in current_flags if "<verified_id_field>" in flag}
+   
+   state_updates = {}
+   if flag_ids:
+       state_updates["orchestrator_seen_flag_ids"] = flag_ids
+   ```
 
-7. **API routes module (path TBD from codebase scan)**
-   - In `GET /runs/{thread_id}` handler: read `state.usage`, sum across nodes, return totals in response payload
-   - Developer must verify existing response structure before nesting `total_usage`
-   - Placeholder path: `src/agents/api/routes.py`
+3. **Call `forced_route(state)` before model decision:**
+
+   ```python
+   route = forced_route(state)
+   ```
+
+4. **Implement model work guards (VERIFIED CONDITIONS REQUIRED FROM Steps 1 and 2):**
+
+   ```python
+   if route is not None:
+       # Guard 1: Pause detection (VERIFIED CONDITION FROM Step 2)
+       # Example (ADJUST to verified condition):
+       if <verified_pause_condition>:  # e.g., state.flagged or len(state.open_flags) > 0
+           decide_result = <verified_model_function_name>(state)  # FROM Step 3
+           decide_result.update(state_updates)
+           return decide_result
+       
+       # Guard 2: Unseen flags (VERIFIED SCHEMA FROM Step 1)
+       unresolved_flags = [f for f in current_flags if not f.get("<verified_resolved_field>")]
+       unseen_flags = [f for f in unresolved_flags if f.get("<verified_id_field>") not in state.orchestrator_seen_flag_ids]
+       if unseen_flags:
+           decide_result = <verified_model_function_name>(state)
+           decide_result.update(state_updates)
+           return decide_result
+       
+       # No model work, write forced hop
+       forced_result = _write_forced_hop(state, route)
+       forced_result.update(state_updates)
+       return forced_result
+   
+   # No forced route, call model
+   decide_result = <verified_model_function_name>(state)
+   decide_result.update(state_updates)
+   return decide_result
+   ```
+
+5. **Implement `_write_forced_hop` (VERIFIED STRUCTURE FROM Steps 3 and 4):**
+
+   ```python
+   def _write_forced_hop(state: State, route: list[str]) -> dict:
+       # VERIFIED STEP STRUCTURE FROM Step 3:
+       step = {
+           "title": f"Next: {route}",
+           "result": "forced: only one valid route",
+           "evidence": {
+               "attempts": 0,
+               # VERIFIED other evidence fields FROM Step 3
+           },
+           # VERIFIED other step fields FROM Step 3
+       }
+       
+       # VERIFIED STATE COMPUTATION FROM Step 3:
+       status = _compute_status(state, route)
+       flagged = _compute_flagged(state, route)
+       priority = _compute_priority(state, route)
+       confidence = _compute_confidence(state, route)
+       summary = state.<verified_summary_field>  # FROM Step 4
+       
+       # VERIFIED RETURN PATTERN FROM Step 4:
+       return {
+           "steps": [step],  # or other verified pattern
+           "next": route,
+           "status": status,
+           "flagged": flagged,
+           "priority": priority,
+           "confidence": confidence,
+           "summary": summary
+       }
+   ```
+
+6. **Implement helper functions for state computation:**
+
+   ```python
+   def _compute_status(state: State, route: list[str]) -> str:
+       # VERIFIED TERMINAL NODE FROM Story 2:
+       if route == [<verified_terminal_node_name>]:  # e.g., ["__end__"]
+           return "complete"
+       return state.<verified_status_field> or "in_progress"
+   
+   def _compute_flagged(state: State, route: list[str]) -> bool:
+       # VERIFIED FLAG FIELD FROM Step 1:
+       current_flags = state.<verified_flag_field_name>
+       unresolved_flags = [f for f in current_flags if not f.get("<verified_resolved_field>")]
+       return len(unresolved_flags) > 0
+   
+   def _compute_priority(state: State, route: list[str]) -> str:
+       return state.<verified_priority_field> or "normal"
+   
+   def _compute_confidence(state: State, route: list[str]) -> str:
+       return "high"  # forced hops are deterministic
+   ```
+
+**CRITICAL NOTE:** Every `<verified_*>` placeholder above MUST be replaced with actual values from `verification-findings.md` before implementation. Code that uses these placeholders will NOT compile or will fail at runtime.
 
 ---
 
-## Interfaces and Data Structures
+## Interfaces
 
-### State Extension
+### `forced_route(state: State) -> list[str] | None`
+
+**Module:** `src/agents/nodes/orchestrator/route_rules.py` (from Story 2)
+
+**Contract:** Returns single valid route or `None`.
+
+**Usage:** Called before model decision to check if route is deterministic.
+
+---
+
+### Model Decision Function (name verified in Step 3)
+
+**Module:** `src/agents/nodes/orchestrator/node.py` (existing function)
+
+**Signature (VERIFIED IN Step 3):**
 
 ```python
-# State schema module (path TBD from codebase scan)
-from typing import Set
-
-# Add to State schema (TypedDict or dataclass)
-seen_flags: Set[str] = field(default_factory=set)
+def <verified_name>(state: State) -> dict:
+    # Name could be _decide, decide_route, or other
 ```
 
-### State Reducer for seen_flags
+**Usage:** Called when model work is required.
+
+---
+
+### `_write_forced_hop(state: State, route: list[str]) -> dict`
+
+**Module:** `src/agents/nodes/orchestrator/node.py` (new function)
+
+**Signature:**
 
 ```python
-# State schema module (path TBD from codebase scan)
-def _reduce_seen_flags(
-    existing: Set[str],
-    delta: Set[str]
-) -> Set[str]:
+def _write_forced_hop(state: State, route: list[str]) -> dict:
     """
-    Union reducer: merge incoming flag IDs with existing.
+    Writes a forced hop step and updates state fields without calling the model.
     
     Args:
-        existing: Current set of seen flag IDs
-        delta: New flag IDs from latest model call's brief
+        state: Current graph state
+        route: Forced route (single valid candidate from forced_route)
     
     Returns:
-        Union of existing and delta
+        dict: State update with step, next, status, flagged, priority, confidence, summary
     """
-    return existing.union(delta)
 ```
 
-### Orchestrator Decision Flow
+**Contract:**
 
-```python
-# Orchestrator node module (path TBD from codebase scan)
-
-def _should_skip_model_call(route: list[str], state: State) -> bool:
-    """
-    Determines if we can skip _decide for this forced route.
-    
-    Returns False (call model) when:
-    1. Route is ["flag-review"] or ["review"] — model writes reviewer summary
-    2. Any unresolved flag exists with ID not in state.seen_flags — model must merge
-    
-    Otherwise returns True (skip model call).
-    """
-    # Exception 1: reviewer summary required
-    if route in [["flag-review"], ["review"]]:
-        return False
-    
-    # Exception 2: unseen flag requires model attention
-    unresolved_flags = [f for f in state.flags if not f.resolved]
-    unseen_flags = [f for f in unresolved_flags if f.id not in state.seen_flags]
-    if unseen_flags:
-        return False
-    
-    return True
-
-
-def decide_next_hop(state: State) -> StateUpdate:
-    """
-    Main orchestrator decision point.
-    """
-    route = forced_route(state)
-    
-    if route is not None and _should_skip_model_call(route, state):
-        # Forced hop: no model call
-        return _record_forced_hop(route, state)
-    else:
-        # Model hop: call _decide as usual
-        result = _decide(state)
-        
-        # Extract flag IDs from brief and update seen_flags
-        brief_flag_ids = _extract_flag_ids_from_brief(result.brief)
-        result.seen_flags_delta = brief_flag_ids
-        
-        return result
-```
-
-### Forced Hop Recording
-
-```python
-# Orchestrator node module (path TBD from codebase scan)
-
-def _record_forced_hop(route: list[str], state: State) -> StateUpdate:
-    """
-    Record a forced hop step without calling the model.
-    
-    Updates status, priority, confidence as a model hop would.
-    Leaves summary unchanged.
-    
-    Note: Developer must locate _compute_status_for_route, 
-    _compute_priority_for_route, and _compute_confidence_for_route 
-    in the codebase before implementing. These functions are assumed 
-    to exist and be used by model hops today.
-    """
-    step = Step(
-        title=f"Next: {route}",
-        result="forced: only one valid route",
-        evidence={"attempts": 0}
-    )
-    
-    # Compute status, priority, confidence (same logic as model hop)
-    new_status = _compute_status_for_route(route, state)
-    new_priority = _compute_priority_for_route(route, state)
-    new_confidence = _compute_confidence_for_route(route, state)
-    
-    return StateUpdate(
-        route=route,
-        step=step,
-        status=new_status,
-        flagged=state.flagged,  # unchanged
-        priority=new_priority,
-        confidence=new_confidence,
-        summary=state.summary,  # unchanged per AC3.2
-    )
-```
-
-### Brief Flag ID Extraction
-
-```python
-# Orchestrator node module (path TBD from codebase scan)
-
-def _extract_flag_ids_from_brief(brief: dict) -> Set[str]:
-    """
-    Extract flag IDs from the brief passed to the model.
-    
-    Args:
-        brief: The input dict sent to run_skill, containing flags list
-    
-    Returns:
-        Set of flag IDs present in the brief
-    """
-    flags = brief.get("flags", [])
-    return {flag["id"] for flag in flags if "id" in flag}
-```
+- Step format matches model hop steps (verified structure from Step 3)
+- State field updates match model hop behavior (verified pattern from Step 3)
+- `summary` is unchanged (carried forward from state)
 
 ---
 
 ## Algorithm Notes
 
-### 1. Orchestrator Integration Logic
+### Decision Flow
+
+1. Extract flag IDs using verified schema → add to `orchestrator_seen_flag_ids`
+2. Call `forced_route(state)`
+3. If `None`, call model (existing behavior)
+4. If route returned:
+   - Check Guard 1 (pause required via verified condition)
+   - Check Guard 2 (unseen flags via verified schema)
+   - If either guard passes, call model
+   - Otherwise, write forced hop
+
+---
+
+### Model Work Guards
+
+**Guard 1: Pause detection (VERIFIED IN Step 2)**
+
+**Condition:** Pause is required (detected by verified state condition from `interrupts.py`, NOT by checking route names).
+
+**Implementation pattern (ADJUST to verified condition):**
 
 ```python
-# Orchestrator node module (path TBD from codebase scan)
-
-def run_orchestrator(state: State) -> StateUpdate:
-    """
-    Orchestrator node execution with forced routing.
-    
-    Flow:
-    1. Call forced_route(state)
-    2. If route is forced:
-       a. Check skip conditions (no pause, no unseen flags)
-       b. If can skip: record forced hop, no model call
-       c. Else: proceed to model call
-    3. If route is None (multiple valid routes): call model
-    4. After any model call: extract brief flag IDs, update seen_flags
-    """
-    route = forced_route(state)
-    
-    if route is not None:
-        # Route is forced — check if we can skip model call
-        if _should_skip_model_call(route, state):
-            # No model work needed: record forced hop
-            return _record_forced_hop(route, state)
-    
-    # Model call needed (route is None OR skip conditions failed)
-    model_result = _decide(state)
-    
-    # Extract flag IDs from brief
-    brief_flag_ids = _extract_flag_ids_from_brief(model_result.brief)
-    
-    # Update seen_flags via reducer (union with existing)
-    return StateUpdate(
-        **model_result.__dict__,
-        seen_flags_delta=brief_flag_ids,
-    )
+# Example patterns (use verified condition from Step 2):
+if state.flagged:
+    # Call model for summary
+if len(state.open_flags) > 0:
+    # Call model for summary
+if state.needs_review:
+    # Call model for summary
 ```
 
-### 2. Usage Aggregation and Logging
+**Note:** Guard 1 does NOT check `route == ["review"]` because no separate pause node exists (verified in Step 2).
+
+---
+
+**Guard 2: Unseen flags (VERIFIED IN Step 1)**
+
+**Condition:** An unresolved flag exists whose ID is not in `orchestrator_seen_flag_ids`.
+
+**Implementation pattern (ADJUST to verified schema):**
 
 ```python
-# Runtime query handler module (path TBD from codebase scan)
-
-def run_query(thread_id: str, query: str) -> dict:
-    """
-    Execute query, aggregate usage, log totals at end/pause.
-    
-    Note: Developer must locate the exact condition in run_query that 
-    signals run end (status transitions to "complete" or "failed") or 
-    pause (status becomes "paused") before implementing the logging call.
-    """
-    # ... existing run logic ...
-    
-    # At run end or pause (developer must identify the exact condition):
-    total_usage = _aggregate_usage(state.usage)
-    
-    _log_usage_totals(total_usage)
-    
-    return {
-        "result": final_result,
-        "usage": total_usage,
-    }
-
-
-def _aggregate_usage(usage_per_node: Dict[str, UsageStats]) -> UsageStats:
-    """
-    Sum usage across all nodes.
-    Uses UsageStats.__add__ from Story 1.
-    """
-    total = UsageStats()
-    for node, stats in usage_per_node.items():
-        total = total + stats
-    return total
-
-
-def _log_usage_totals(usage: UsageStats):
-    """
-    Log total usage at INFO level.
-    """
-    logger.info(
-        f"Run completed — "
-        f"calls: {usage.calls}, "
-        f"input_tokens: {usage.input_tokens}, "
-        f"output_tokens: {usage.output_tokens}, "
-        f"cache_creation_input_tokens: {usage.cache_creation_input_tokens}, "
-        f"cache_read_input_tokens: {usage.cache_read_input_tokens}"
-    )
+current_flags = state.<verified_flag_field>
+unresolved_flags = [f for f in current_flags if not f.get("<verified_resolved_field>")]
+unseen_flags = [f for f in unresolved_flags if f.get("<verified_id_field>") not in state.orchestrator_seen_flag_ids]
+if unseen_flags:
+    # Call model to merge
 ```
 
-### 3. API Response Extension
+---
 
-```python
-# API routes module (path TBD from codebase scan)
+## Edge Cases
 
-@app.get("/runs/{thread_id}")
-def get_run(thread_id: str) -> dict:
-    """
-    Return run status and values, including total usage.
-    
-    CRITICAL: Developer must inspect the existing GET /runs/{thread_id} 
-    response structure before implementing. Verify where "values" nests 
-    and what existing fields it contains. The placeholder below assumes 
-    "values" is a root-level dict per HLD AD-5, but this must be confirmed 
-    from the actual API handler code.
-    
-    After codebase scan, adjust the return structure and Test 4's assertions 
-    to match the discovered schema.
-    """
-    state = load_state(thread_id)
-    
-    # Aggregate usage across nodes
-    total_usage = _aggregate_usage(state.usage)
-    
-    # Developer: Verify existing response structure before implementing.
-    # Placeholder assumes values.total_usage per HLD AD-5.
-    return {
-        "thread_id": thread_id,
-        "status": state.status,
-        "values": {
-            # Existing values fields — developer must preserve these
-            # (inspect current handler to identify them)
-            # ...
-            
-            # New total_usage field
-            "total_usage": {
-                "calls": total_usage.calls,
-                "input_tokens": total_usage.input_tokens,
-                "output_tokens": total_usage.output_tokens,
-                "cache_creation_input_tokens": total_usage.cache_creation_input_tokens,
-                "cache_read_input_tokens": total_usage.cache_read_input_tokens,
-            }
-        }
-    }
-```
+### Edge Case 1: Pause required on forced route (model work required)
 
-### 4. State Migration for seen_flags
+**Scenario:** `forced_route` returns a route, but pause condition is met (verified from Step 2).
 
-```python
-# State loader module (path TBD from codebase scan)
+**Handling:** Guard 1 triggers → call model decision function for summary.
 
-def load_state(serialized_state: dict) -> State:
-    """
-    Load state from persistence, handling missing fields.
-    
-    Pre-change runs have no 'usage' or 'seen_flags'.
-    Default both to empty to allow execution to continue.
-    
-    Note: This extends Story 1's migration logic. If Story 1's loader 
-    already handles 'usage', add 'seen_flags' handling in the same pattern.
-    """
-    if "usage" not in serialized_state:
-        serialized_state["usage"] = {}
-    
-    if "seen_flags" not in serialized_state:
-        serialized_state["seen_flags"] = set()
-    
-    return State(**serialized_state)
-```
+**Test:** AC4
+
+---
+
+### Edge Case 2: Unseen flag on forced route (model work required)
+
+**Scenario:** `forced_route` returns a route, but an unseen flag exists (verified schema from Step 1).
+
+**Handling:** Guard 2 triggers → call model decision function for merge.
+
+**Test:** AC5
+
+---
+
+### Edge Case 3: Flag schema different than assumed
+
+**Scenario:** After Step 1 verification, flags are stored in `state.active_flags` with ID field `flag_id`, not `state.flags` with `id`.
+
+**Handling:** All flag references adjusted to verified schema before implementation.
+
+**Mitigation:** Step 1 verification prevents runtime discovery.
+
+---
+
+### Edge Case 4: Pause is interrupt-based (no route nodes)
+
+**Scenario:** After Step 2 verification, pause is triggered by `interrupt_before`, not by routing.
+
+**Handling:** Guard 1 checks verified state condition (e.g., `state.flagged`), not route name.
+
+**Mitigation:** Step 2 verification reveals mechanism before implementation.
+
+---
+
+### Edge Case 5: Flag missing ID field
+
+**Scenario:** A flag has no ID field (malformed state).
+
+**Handling:** Flag extraction skips it: `{f.get("id") for f in flags if "id" in f}` (adjusted to verified field name).
+
+**Assumption:** Flags always have IDs (enforced elsewhere). Log warning if encountered.
 
 ---
 
 ## Tests
 
-### Test File 1: Orchestrator Forced Routing Tests (path TBD)
+### Test File: `tests/test_orchestrator_forced.py`
 
-6 tests matching the breakdown.md verification count exactly. Developer must construct realistic State instances by examining the actual State schema before writing these tests.
+**Setup:**
 
-#### Test 1: Forced Hop with No Pause, No Unseen Flags → No Model Call
+- Mock `forced_route` to return canned routes
+- Mock model decision function (verified name from Step 3)
+- Use verified field names from Steps 1 and 4
+- No live model calls
+
+**CRITICAL:** All test code below uses PLACEHOLDERS. Replace with verified values from `verification-findings.md`.
+
+---
+
+#### Test 1: Forced route, no model work → model not called, `attempts: 0`
 
 ```python
-def test_forced_hop_no_model_call(fake_gateway, mocker):
-    """
-    Given forced_route returns ["planner"] and no skip conditions apply
-    When orchestrator decides next hop
-    Then no model call is made (via gateway mock)
-    And forced hop step is recorded
-    
-    Verifies AC3.1, AC4.1
-    
-    Developer: Replace placeholder import paths with actual paths from codebase scan.
-    """
-    # Developer: Replace 'path.to.forced_route' with actual module path
-    mock_forced_route = mocker.patch(
-        'path.to.forced_route',  # Placeholder — replace with actual path
-        return_value=["planner"]
-    )
-    
-    # Developer: Replace 'path.to._decide' with actual module path
-    mock_decide = mocker.patch(
-        'path.to._decide'  # Placeholder — replace with actual path
-    )
-    
-    # Developer: Construct State with all required fields from schema scan
+from unittest.mock import patch
+from src.agents.graph.states import State
+from src.agents.nodes.orchestrator.node import <verified_main_function_name>  # FROM Step 3
+
+def test_orchestrator_skips_model_on_forced():
+    # VERIFIED FIELD NAMES FROM Step 1 and Step 4:
     state = State(
-        # Add all required State fields here after schema scan
-        flags=[],
-        seen_flags=set(),
+        <verified_flag_field_name>=[],  # e.g., flags=[]
+        orchestrator_seen_flag_ids=set(),
+        <verified_status_field>="in_progress",  # e.g., status="in_progress"
+        <verified_summary_field>="Previous summary"  # e.g., summary="Previous summary"
     )
     
-    # Developer: Replace 'run_orchestrator' with actual function name if different
-    result = run_orchestrator(state)
-    
-    # Assert forced_route was called
-    mock_forced_route.assert_called_once_with(state)
-    
-    # Assert _decide was NOT called
-    mock_decide.assert_not_called()
-    
-    # Assert forced hop step recorded
-    assert result.step.title == "Next: ['planner']"
-    assert result.step.result == "forced: only one valid route"
-    assert result.step.evidence["attempts"] == 0
-```
-
-#### Test 2: Forced Route ["flag-review"] → Model Called
-
-```python
-def test_forced_route_flag_review_calls_model(fake_gateway, mocker):
-    """
-    Given forced_route returns ["flag-review"]
-    When orchestrator decides next hop
-    Then model is called (to write reviewer summary)
-    
-    Verifies AC3.3, AC4.2
-    
-    Developer: Replace placeholder import paths with actual paths from codebase scan.
-    """
-    # Developer: Replace with actual paths
-    mock_forced_route = mocker.patch(
-        'path.to.forced_route',
-        return_value=["flag-review"]
-    )
-    
-    mock_decide = mocker.patch(
-        'path.to._decide',
-        return_value=StateUpdate(
-            route=["flag-review"],
-            summary="Reviewer summary",
-            brief={"flags": []},
-        )
-    )
-    
-    # Developer: Construct State with all required fields
-    state = State(
-        # Add all required State fields here
-        flags=[],
-        seen_flags=set()
-    )
-    
-    result = run_orchestrator(state)
-    
-    # Assert _decide WAS called
-    mock_decide.assert_called_once()
-```
-
-#### Test 3: Unresolved Flag Not in seen_flags → Model Called
-
-```python
-def test_unseen_flag_calls_model(fake_gateway, mocker):
-    """
-    Given forced_route returns ["analyst"] (forced)
-    And an unresolved flag exists with ID not in seen_flags
-    When orchestrator decides next hop
-    Then model is called (to merge/address the flag)
-    
-    Verifies AC3.4, AC4.2
-    
-    Developer: Replace placeholder paths and construct Flag instances per actual schema.
-    """
-    # Developer: Replace with actual paths
-    mock_forced_route = mocker.patch(
-        'path.to.forced_route',
-        return_value=["analyst"]
-    )
-    
-    mock_decide = mocker.patch(
-        'path.to._decide',
-        return_value=StateUpdate(
-            route=["analyst"],
-            brief={"flags": [{"id": "flag-123"}]},
-        )
-    )
-    
-    # Developer: Construct State and Flag instances per actual schema
-    state = State(
-        # Add all required State fields here
-        flags=[Flag(id="flag-123", resolved=False)],
-        seen_flags=set(),
-    )
-    
-    result = run_orchestrator(state)
-    
-    # Assert _decide WAS called (flag requires model attention)
-    mock_decide.assert_called_once()
-```
-
-#### Test 4: Forced Hop Step Structure Matches Expectations
-
-```python
-def test_forced_hop_step_structure(fake_gateway, mocker):
-    """
-    Given a forced hop is recorded
-    When the step is written
-    Then title, result, evidence, status/priority/confidence match expected format
-    And summary is unchanged
-    
-    Verifies AC3.2, AC4.3
-    
-    Developer: Replace placeholder paths and construct State with required fields.
-    """
-    # Developer: Replace with actual path
-    mocker.patch(
-        'path.to.forced_route',
-        return_value=["planner"]
-    )
-    
-    # Developer: Construct State with all required fields
-    state = State(
-        # Add all required State fields here
-        flags=[],
-        seen_flags=set(),
-        summary="Previous summary",
-        status="running",
-        priority=5,
-        confidence=0.8,
-    )
-    
-    result = run_orchestrator(state)
-    
-    # Assert step structure
-    assert result.step.title == "Next: ['planner']"
-    assert result.step.result == "forced: only one valid route"
-    assert result.step.evidence == {"attempts": 0}
-    
-    # Assert status/priority/confidence updated (implementation-specific values)
-    # Developer: Adjust expected values after discovering what 
-    # _compute_status_for_route, _compute_priority_for_route, 
-    # _compute_confidence_for_route actually return
-    assert result.status in ["running", "waiting", "complete"]
-    assert isinstance(result.priority, int)
-    assert 0 <= result.confidence <= 1
-    
-    # Assert summary unchanged
-    assert result.summary == "Previous summary"
-```
-
-#### Test 5: seen_flags Updated After Model Call
-
-```python
-def test_seen_flags_updated_after_model_call(fake_gateway, mocker):
-    """
-    Given model call includes flags in brief
-    When orchestrator extracts flag IDs
-    Then seen_flags is updated with those IDs
-    
-    Verifies AC3.5
-    
-    Developer: Replace placeholder paths and construct State with required fields.
-    """
-    # Developer: Replace with actual paths
-    mocker.patch(
-        'path.to.forced_route',
-        return_value=None  # Multiple routes, model called
-    )
-    
-    mock_decide = mocker.patch(
-        'path.to._decide',
-        return_value=StateUpdate(
-            route=["analyst"],
-            brief={"flags": [
-                {"id": "flag-123"},
-                {"id": "flag-456"},
-            ]},
-        )
-    )
-    
-    # Developer: Construct State with all required fields
-    state = State(
-        # Add all required State fields here
-        flags=[],
-        seen_flags=set()
-    )
-    
-    result = run_orchestrator(state)
-    
-    # Assert seen_flags delta contains flag IDs from brief
-    assert result.seen_flags_delta == {"flag-123", "flag-456"}
-```
-
-#### Test 6: Forced Hop and Model Hop Produce Same Status Updates from Different Initial States
-
-```python
-def test_forced_hop_status_matches_model_hop_different_states(fake_gateway, mocker):
-    """
-    Given two different initial states (A and B)
-    When forced hop is taken with each state
-    Then status/priority/confidence differ between the two forced hops
-    (proving the helpers are actually computing, not hardcoded)
-    
-    And when model hop is taken with state A
-    Then status/priority/confidence match forced hop A's values
-    (proving forced and model hops use the same computation logic)
-    
-    Verifies AC3.2 (forced hop updates use same helper functions as model hop)
-    
-    CRITICAL: This test avoids circular mocking by comparing outcomes from 
-    different initial states. It verifies that:
-    1. The helpers produce different results for different inputs (not hardcoded)
-    2. Forced hops and model hops compute the same values for the same input
-    
-    Developer: After locating _compute_status_for_route, _compute_priority_for_route, 
-    _compute_confidence_for_route, replace the mock_decide_impl placeholder calls 
-    with actual invocations of those functions.
-    """
-    # State A: initial conditions where status/priority/confidence compute to one set
-    state_a = State(
-        # Developer: Add all required State fields here
-        flags=[],
-        seen_flags=set(),
-        status="running",
-        priority=5,
-        confidence=0.8,
-    )
-    
-    # State B: different conditions where helpers should produce different values
-    # Developer: Adjust these values to create a state that actually differs in 
-    # ways that affect status/priority/confidence computation
-    state_b = State(
-        # Developer: Add all required State fields here
-        flags=[Flag(id="flag-999", resolved=False)],  # Different flag state
-        seen_flags=set(),
-        status="paused",  # Different status
-        priority=2,  # Different priority
-        confidence=0.3,  # Different confidence
-    )
-    
-    # Path 1: Forced hop with state A
-    # Developer: Replace with actual path
-    mocker.patch(
-        'path.to.forced_route',
-        return_value=["planner"]
-    )
-    forced_result_a = run_orchestrator(state_a)
-    
-    # Path 2: Forced hop with state B
-    forced_result_b = run_orchestrator(state_b)
-    
-    # Assert different initial states produce different outcomes
-    # (proves the helpers are actually computing based on state, not hardcoded)
-    # Developer: If this assertion fails, adjust state_b to create a meaningful difference
-    assert (
-        forced_result_a.status != forced_result_b.status or 
-        forced_result_a.priority != forced_result_b.priority or 
-        forced_result_a.confidence != forced_result_b.confidence
-    ), "Forced hops with different initial states should produce different status/priority/confidence"
-    
-    # Path 3: Model hop with state A (for same route as forced hop A)
-    # Reset mocks
-    mocker.patch(
-        'path.to.forced_route',
-        return_value=None  # Force model call
-    )
-    
-    # Mock _decide to call the same _compute_X_for_route functions
-    # Developer: After discovering the actual helper functions, replace the 
-    # placeholder return values with calls to those functions
-    def mock_decide_impl(state):
-        route = ["planner"]
-        return StateUpdate(
-            route=route,
-            # Developer: Replace these placeholders with actual function calls:
-            # status=_compute_status_for_route(route, state),
-            # priority=_compute_priority_for_route(route, state),
-            # confidence=_compute_confidence_for_route(route, state),
-            status="placeholder_status",  # Replace after discovering function
-            priority=999,  # Replace after discovering function
-            confidence=0.999,  # Replace after discovering function
-            summary="Model summary",  # Different from forced (forced leaves unchanged)
-            brief={"flags": []},
-        )
-    
-    # Developer: Replace with actual path
-    mocker.patch(
-        'path.to._decide',
-        side_effect=mock_decide_impl
-    )
-    
-    model_result_a = run_orchestrator(state_a)
-    
-    # Assert forced hop A and model hop A produce same status/priority/confidence
-    # Developer: After replacing the mock_decide_impl placeholders with actual 
-    # function calls, this assertion will verify both code paths compute the same values
-    assert forced_result_a.status == model_result_a.status, \
-        "Forced hop and model hop should compute same status for same initial state"
-    assert forced_result_a.priority == model_result_a.priority, \
-        "Forced hop and model hop should compute same priority for same initial state"
-    assert forced_result_a.confidence == model_result_a.confidence, \
-        "Forced hop and model hop should compute same confidence for same initial state"
-    
-    # Assert summary behavior differs as expected (forced unchanged, model changed)
-    assert forced_result_a.summary == state_a.summary, \
-        "Forced hop should leave summary unchanged"
-    assert model_result_a.summary == "Model summary", \
-        "Model hop should update summary"
+    with patch("src.agents.nodes.orchestrator.node.forced_route") as mock_forced:
+        with patch("src.agents.nodes.orchestrator.node.<verified_model_function_name>") as mock_decide:  # FROM Step 3
+            mock_forced.return_value = ["planner"]  # VERIFIED node name from Story 2
+            
+            result = <verified_main_function_name>(state)  # FROM Step 3
+            
+            mock_decide.assert_not_called()
+            
+            # VERIFIED step structure FROM Step 3:
+            assert result["steps"][0]["title"] == "Next: ['planner']"
+            assert result["steps"][0]["result"] == "forced: only one valid route"
+            assert result["steps"][0]["evidence"]["attempts"] == 0
+            assert result["next"] == ["planner"]
 ```
 
 ---
 
-### Test File 2: Usage Tracking Integration Tests (path TBD)
-
-4 tests matching the breakdown.md verification count exactly.
-
-#### Test 1: Usage Accumulates Across Multiple Calls
+#### Test 2: Pause required → model called
 
 ```python
-def test_usage_accumulates_across_calls(fake_gateway):
-    """
-    Given multiple model calls occur for different nodes
-    When run completes
-    Then state.usage correctly sums counts per node
-    
-    Verifies AC4.4
-    
-    Developer: Construct State and StateUpdate instances per actual schema.
-    """
-    # Developer: Construct State with all required fields
+def test_orchestrator_calls_model_on_pause():
+    # VERIFIED pause condition FROM Step 2 (e.g., state.flagged = True):
     state = State(
-        # Add all required State fields here
-        usage={}
+        <verified_flag_field_name>=[{"<verified_id_field>": "flag1", "<verified_resolved_field>": False}],
+        orchestrator_seen_flag_ids=set(),
+        <verified_status_field>="in_progress",
+        <verified_summary_field>="Previous summary",
+        flagged=True  # EXAMPLE pause trigger (adjust to verified condition)
     )
     
-    # Node 1: two calls
-    update1 = StateUpdate(usage={
-        "orchestrator": UsageStats(calls=1, input_tokens=100, output_tokens=50, cache_creation_input_tokens=10, cache_read_input_tokens=5)
-    })
-    state = apply_update(state, update1)
-    
-    update2 = StateUpdate(usage={
-        "orchestrator": UsageStats(calls=1, input_tokens=200, output_tokens=75, cache_creation_input_tokens=20, cache_read_input_tokens=10)
-    })
-    state = apply_update(state, update2)
-    
-    # Node 2: one call
-    update3 = StateUpdate(usage={
-        "planner": UsageStats(calls=1, input_tokens=150, output_tokens=60, cache_creation_input_tokens=15, cache_read_input_tokens=7)
-    })
-    state = apply_update(state, update3)
-    
-    # Assert totals per node
-    assert state.usage["orchestrator"].calls == 2
-    assert state.usage["orchestrator"].input_tokens == 300
-    assert state.usage["planner"].calls == 1
-    assert state.usage["planner"].input_tokens == 150
+    with patch("src.agents.nodes.orchestrator.node.forced_route") as mock_forced:
+        with patch("src.agents.nodes.orchestrator.node.<verified_model_function_name>") as mock_decide:
+            mock_forced.return_value = [<verified_next_node>]  # Any route
+            mock_decide.return_value = {
+                "steps": [{"title": "Pause", "result": "Review needed", "evidence": {"attempts": 1}}],
+                "next": [<verified_next_node>],
+                "summary": "Summary from model"
+            }
+            
+            result = <verified_main_function_name>(state)
+            
+            mock_decide.assert_called_once()  # Model SHOULD be called
+            assert result["steps"][0]["evidence"]["attempts"] == 1
 ```
 
-#### Test 2: Run with No usage/seen_flags Fields Loads and Resumes
+**Note:** Adjust pause condition (`flagged=True`) to verified condition from Step 2.
+
+---
+
+#### Test 3: Unseen flag → model called
 
 ```python
-def test_run_without_usage_seen_flags_resumes(fake_gateway):
-    """
-    Given a run was saved before usage/seen_flags tracking existed
-    When the run is loaded and resumed
-    Then no error occurs and both fields initialize to empty
+def test_orchestrator_calls_model_on_unseen_flag():
+    # VERIFIED flag schema FROM Step 1:
+    state = State(
+        <verified_flag_field_name>=[
+            {"<verified_id_field>": "flag1", "<verified_resolved_field>": False}
+        ],
+        orchestrator_seen_flag_ids=set(),  # flag1 is unseen
+        <verified_status_field>="in_progress",
+        <verified_summary_field>="Previous summary"
+    )
     
-    Verifies AC4.4 (state migration)
-    
-    CRITICAL: Developer must identify all required State schema fields before 
-    writing this test. The old_state_data dict must include those fields to 
-    avoid schema validation errors before the loader's migration check runs.
-    
-    Without all required fields, the test will fail with schema validation 
-    error instead of testing the migration logic.
-    
-    Developer: After scanning State schema, replace the placeholder fields 
-    below with the actual required fields.
-    """
-    # Developer: Replace with ALL required State fields from schema scan
-    old_state_data = {
-        "run_id": "test-123",
-        "status": "paused",
-        # Developer: Add ALL other required State fields here 
-        # (e.g. flags, plan, thread_id, values, etc.)
-        # Do NOT include 'usage' or 'seen_flags' — those are being tested
-    }
-    
-    state = load_state(old_state_data)
-    
-    # Assert state loaded successfully
-    assert state.run_id == "test-123"
-    assert state.usage == {}
-    assert state.seen_flags == set()
-    
-    # Resume execution (no error)
-    result = run_orchestrator(state)
-    assert result is not None
+    with patch("src.agents.nodes.orchestrator.node.forced_route") as mock_forced:
+        with patch("src.agents.nodes.orchestrator.node.<verified_model_function_name>") as mock_decide:
+            mock_forced.return_value = ["__end__"]  # VERIFIED terminal node from Story 2
+            mock_decide.return_value = {
+                "steps": [{"title": "Merge", "result": "Flags merged", "evidence": {"attempts": 1}}],
+                "next": ["__end__"],
+                "summary": "Merged summary"
+            }
+            
+            result = <verified_main_function_name>(state)
+            
+            mock_decide.assert_called_once()  # Model SHOULD be called
 ```
 
-#### Test 3: run_query Logs Totals at Run End
+---
+
+#### Test 4: Flag IDs extracted before decision
 
 ```python
-def test_run_query_logs_usage_totals(fake_gateway, caplog):
-    """
-    Given a run completes
-    When run_query finishes
-    Then total usage is logged at INFO level
+def test_orchestrator_updates_seen_flag_ids():
+    state = State(
+        <verified_flag_field_name>=[
+            {"<verified_id_field>": "flag1", "<verified_resolved_field>": False},
+            {"<verified_id_field>": "flag2", "<verified_resolved_field>": True}
+        ],
+        orchestrator_seen_flag_ids=set(),
+        <verified_status_field>="in_progress",
+        <verified_summary_field>="Summary"
+    )
     
-    Verifies AC4.4
+    with patch("src.agents.nodes.orchestrator.node.forced_route", return_value=None):
+        with patch("src.agents.nodes.orchestrator.node.<verified_model_function_name>") as mock_decide:
+            mock_decide.return_value = {"steps": [], "next": ["planner"]}
+            
+            result = <verified_main_function_name>(state)
+            
+            # Verify flag IDs were added to state update
+            assert "orchestrator_seen_flag_ids" in result
+            assert result["orchestrator_seen_flag_ids"] == {"flag1", "flag2"}
+```
+
+---
+
+#### Test 5: Forced hop state fields match model hop
+
+```python
+def test_forced_hop_state_fields():
+    state = State(
+        <verified_flag_field_name>=[],
+        orchestrator_seen_flag_ids=set(),
+        <verified_status_field>="in_progress",
+        <verified_summary_field>="Previous summary",
+        <verified_priority_field>="normal",
+        <verified_confidence_field>="medium"
+    )
     
-    Developer: Construct State with all required fields and verify the 
-    condition that triggers logging in run_query before implementing.
-    """
-    # Developer: Construct State with all required fields
+    with patch("src.agents.nodes.orchestrator.node.forced_route", return_value=["planner"]):
+        result = <verified_main_function_name>(state)
+        
+        # VERIFIED field names FROM Step 4:
+        assert result["status"] in ["in_progress", "complete"]  # Depends on route
+        assert "flagged" in result
+        assert "priority" in result
+        assert "confidence" in result
+        assert result["summary"] == "Previous summary"  # Unchanged
+```
+
+---
+
+#### Test 6: Forced hop evidence structure
+
+```python
+def test_forced_hop_evidence_complete():
+    state = State(
+        <verified_flag_field_name>=[],
+        orchestrator_seen_flag_ids=set(),
+        <verified_status_field>="in_progress",
+        <verified_summary_field>="Summary"
+    )
+    
+    with patch("src.agents.nodes.orchestrator.node.forced_route", return_value=["planner"]):
+        result = <verified_main_function_name>(state)
+        
+        evidence = result["steps"][0]["evidence"]
+        assert evidence["attempts"] == 0
+        # VERIFIED other evidence fields FROM Step 3 (if any)
+```
+
+---
+
+## Implementation Checklist
+
+**BLOCKING PRE-IMPLEMENTATION:**
+
+- [ ] Complete Step 1: Verify flag schema in `states.py`
+- [ ] Complete Step 2: Verify pause detection in `interrupts.py`
+- [ ] Complete Step 3: Verify orchestrator function structure in `node.py`

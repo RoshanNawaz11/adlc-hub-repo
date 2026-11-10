@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "key": "PER-128",
+  "source": "llm",
+  "summary": "Standard multi-concern refactoring that needs concrete file plan (State schema, routing logic, orchestrator flow, usage tracking) with cross-artifact consistency checks.",
+  "track_hint": "standard",
+  "loop": "story_with_design",
+  "delivery": "delivery",
+  "pr_fix": [
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "loops": [
+    "story_with_design",
+    "delivery",
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "steps": [
+    {
+      "node": "analyst",
+      "activity": "inline_story",
+      "why": "Ticket already has clear Given/When/Then requirements and concrete acceptance criteria.",
+      "instructions": "Extract the requirements and acceptance criteria as stated; this is implementation detail for an existing system, not a user-facing feature.",
+      "auto": false,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "designer",
+      "activity": "lld",
+      "why": "Multiple files must be modified in coordinated way: State schema, route_rules.py logic, node.py orchestrator flow, usage tracking across runner.py, client.py, bindings.py.",
+      "instructions": "Focus on State schema changes (usage field with reducer, seen_flags tracking), forced_route implementation without duplicating broken_rules logic, orchestrator decision tree (when to skip model vs when model work remains), and usage accumulation at each call site.",
+      "auto": false,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "test_architect",
+      "activity": "tests",
+      "why": "Acceptance criteria specify several test scenarios with precise assertions about forced routes, model call skipping, usage tracking, and backwards compatibility.",
+      "instructions": "Map each AC bullet to concrete test cases; ensure coverage of forced route scenarios, orchestrator model skip logic, usage accumulation across retries and tool rounds, and state migration.",
+      "auto": false,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "critic",
+      "activity": "consistency_check",
+      "why": "Requirements, design and tests must agree on State schema fields, forced_route behavior, orchestrator skip conditions, and usage tracking locations.",
+      "instructions": "",
+      "auto": false,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "architect_gate",
+      "activity": "review",
+      "why": "Human approval of specs and this plan before Dev.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "dev",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pre_pr_qa",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "open_pr",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pr_review",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "merge",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    }
+  ],
+  "skipped": [
+    {
+      "node": "tpm_gate",
+      "why": "Ticket clearly states scope (routing optimization and usage tracking in existing orchestrator), acceptance criteria are concrete implementation checks, no product sign-off needed for internal performance optimization."
+    }
+  ],
+  "suggested_roles": [],
+  "suggested_loops": [],
+  "notes": [],
+  "created_at": "2026-11-09T12:11:46.673636+00:00",
+  "version": 2,
+  "trigger": "ticket",
+  "gate": null,
+  "feedback": [],
+  "feedback_errors": [],
+  "seen_feedback_ids": [],
+  "change_summary": "",
+  "changes": null,
+  "addressed": [],
+  "unresolved_questions": [],
+  "requires_review": true
+}
