@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "key": "PER-223",
+  "source": "llm",
+  "summary": "This feature adds reason validation to case rejections across three entry points (console, CLI, queue); story_with_design fits because it affects several files in one component and needs a concrete file plan before coding.",
+  "track_hint": "standard",
+  "loop": "story_with_design",
+  "delivery": "delivery",
+  "pr_fix": [
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "loops": [
+    "story_with_design",
+    "delivery",
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "steps": [
+    {
+      "node": "analyst",
+      "activity": "inline_story",
+      "why": "Convert the detailed acceptance criteria into Given/When/Then requirements with technical notes.",
+      "instructions": "Focus on the validation rules (empty, whitespace-only, trimming) and the three rejection entry points.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "designer",
+      "activity": "lld",
+      "why": "Multiple entry points for rejection need a file plan showing where validation is centralized and how each path calls it.",
+      "instructions": "Show which files handle console, CLI, and queue rejections, where the shared validation logic lives, and how trimming is applied.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "test_architect",
+      "activity": "tests",
+      "why": "Five acceptance criteria with specific edge cases (empty, whitespace-only, trimming) need explicit test coverage.",
+      "instructions": "Map tests 1:1 to the ACs, covering each entry point and each invalid reason case.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "critic",
+      "activity": "consistency_check",
+      "why": "Requirements, LLD, and tests must agree on validation rules and the three entry points.",
+      "instructions": "Verify that the validation logic (empty, whitespace, trimming) is described consistently across all spec documents and that all three entry points are covered.",
+      "auto": false,
+      "status": "pending",
+      "rerun": true
+    },
+    {
+      "node": "architect_gate",
+      "activity": "review",
+      "why": "Human approval of specs and this plan before Dev.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": true
+    },
+    {
+      "node": "dev",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pre_pr_qa",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "open_pr",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pr_review",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "merge",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    }
+  ],
+  "skipped": [
+    {
+      "node": "tpm_gate",
+      "why": "Scope and acceptance criteria are concrete and internal-facing; no product ambiguity or user-facing decisions."
+    }
+  ],
+  "suggested_roles": [],
+  "suggested_loops": [],
+  "notes": [],
+  "created_at": "2026-11-11T09:47:54.045888+00:00",
+  "version": 3,
+  "trigger": "review",
+  "gate": "plan_review",
+  "feedback": [
+    {
+      "id": "hub#28:issue-6791757443",
+      "source": "pr_conversation",
+      "body": "add critic to planner",
+      "author": "RoshanNawaz11",
+      "path": null,
+      "line": null,
+      "pr": "hub#28"
+    },
+    {
+      "id": "hub#28:issue-6791891194",
+      "source": "pr_conversation",
+      "body": "add critic to planner",
+      "author": "RoshanNawaz11",
+      "path": null,
+      "line": null,
+      "pr": "hub#28"
+    }
+  ],
+  "feedback_errors": [],
+  "seen_feedback_ids": [
+    "hub#28:issue-6791757443",
+    "hub#28:issue-6791891194"
+  ],
+  "change_summary": "Added critic step as requested by the reviewer to ensure consistency across requirements, LLD, and test specs.",
+  "changes": {
+    "added": [],
+    "removed": [],
+    "rerun": [],
+    "kept": []
+  },
+  "addressed": [
+    {
+      "feedback_id": "hub#28:issue-6791757443",
+      "change": "Added critic step to the plan with consistency_check activity."
+    },
+    {
+      "feedback_id": "hub#28:issue-6791891194",
+      "change": "Added critic step to the plan with consistency_check activity."
+    }
+  ],
+  "unresolved_questions": [],
+  "requires_review": true
+}

@@ -24,11 +24,11 @@ Added critic step as requested by the reviewer to ensure consistency across requ
 
 ## Steps
 
-1. [ ] **analyst (inline_story)** _(rerun)_ — Convert the detailed acceptance criteria into Given/When/Then requirements with technical notes.
+1. [x] **analyst (inline_story)** — Convert the detailed acceptance criteria into Given/When/Then requirements with technical notes.
    - focus: Focus on the validation rules (empty, whitespace-only, trimming) and the three rejection entry points.
-2. [ ] **designer (lld)** _(rerun)_ — Multiple entry points for rejection need a file plan showing where validation is centralized and how each path calls it.
+2. [x] **designer (lld)** — Multiple entry points for rejection need a file plan showing where validation is centralized and how each path calls it.
    - focus: Show which files handle console, CLI, and queue rejections, where the shared validation logic lives, and how trimming is applied.
-3. [ ] **test_architect (tests)** _(rerun)_ — Five acceptance criteria with specific edge cases (empty, whitespace-only, trimming) need explicit test coverage.
+3. [x] **test_architect (tests)** — Five acceptance criteria with specific edge cases (empty, whitespace-only, trimming) need explicit test coverage.
    - focus: Map tests 1:1 to the ACs, covering each entry point and each invalid reason case.
 4. [ ] **critic (consistency_check)** _(rerun)_ — Requirements, LLD, and tests must agree on validation rules and the three entry points.
    - focus: Verify that the validation logic (empty, whitespace, trimming) is described consistently across all spec documents and that all three entry points are covered.

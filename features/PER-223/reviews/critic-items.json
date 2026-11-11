@@ -1,0 +1,79 @@
+{
+  "items": [
+    {
+      "id": "C1",
+      "file": "stories/01-agent.md",
+      "section": "## Interfaces",
+      "quote": "validate_rejection_reason(self.reason)",
+      "match": [
+        [
+          "stories/01-agent.md",
+          "## Algorithm Notes \u203a ### CLI Entry Point (REQ-3)"
+        ]
+      ],
+      "problem": "The interface says \"Let `ValueError` propagate\" and \"Store the trimmed return value in `self.reason`\", but the pseudo-code in Algorithm Notes shows `self.reason = validate_rejection_reason(self.reason)` with no comment about propagation. The two readings disagree on whether the validator both assigns and propagates, or only assigns.",
+      "change": "In the pseudo-code, add a comment after the assignment: `# ValueError propagates; Pydantic converts to 422` so Dev knows the validator does both.",
+      "status": "fixed",
+      "reason": "not raised again in round 2 (without a fix)",
+      "round": 1,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": false,
+      "blocks_because": "The pseudo-code shows calling `validate_rejection_reason(self.reason)` and assigning its return to `self.reason`, but the interface description says \"Let `ValueError` propagate\", so Dev would write the validator without the assignment and the trimmed reason would never be saved.",
+      "trail": [
+        "round 1: raised (blocking)",
+        "round 1: cannot fix: fix not applied: would drop sections: src/agents/graph/validation.py` (new)",
+        "round 2: fixed: not raised again in round 2 (without a fix)"
+      ]
+    },
+    {
+      "id": "C2",
+      "file": "stories/01-agent.md",
+      "section": "## Algorithm Notes",
+      "quote": "reason.strip()",
+      "match": [],
+      "problem": "The validation function spec lists three steps: check `None`, check `\"\"`, check `strip() == \"\"`. The existing code does `if self.action == \"reject\" and not self.reason`, which covers `None` and `\"\"` in one check. The spec would lead Dev to write more checks than needed.",
+      "change": "Simplify the validation function spec to match Python idiom: \"1. If `reason is None or reason == \"\"` \u2192 invalid. 2. If `reason.strip() == \"\"` \u2192 invalid. 3. Else valid \u2192 return `reason.strip()`.\" The function signature already shows `reason: str | None`, so the two-step check is clear.",
+      "status": "rejected",
+      "reason": "The existing validator in `src/agents/runtime/server.py` line 54-57 uses `if self.action == \"reject\" and not self.reason` which treats `None` and `\"\"` the same (both are falsy in Python). The validation function spec says to check `if reason is None or reason == \"\"` as one step, which is logically equivalent. No simplification is needed \u2014 the spec already matches Python idiom.",
+      "round": 1,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "The current validator uses `not self.reason` to check for empty, which treats `None` and `\"\"` the same, but the new validation function spec says to check `if reason is None` and `if reason == \"\"` as separate steps before calling `strip()`. Dev following the spec would write three separate checks when the existing code shows one check is enough.",
+      "trail": [
+        "round 1: raised (blocking)",
+        "round 1: rejected: The existing validator in `src/agents/runtime/server.py` line 54-57 uses `if self.action == \"reject\" and not self.reason` which treats `None` and `\"\"` the same (both are falsy in Python). The validation function spec says to check `if reason is None or reason == \"\"` as one step, which is logically equivalent. No simplification is needed \u2014 the spec already matches Python idiom."
+      ]
+    },
+    {
+      "id": "C3",
+      "file": "stories/01-agent.md",
+      "section": "## File Plan",
+      "quote": "src/agents/graph/validation.py",
+      "match": [
+        [
+          "critic-items.md",
+          "C3 \u203a decided"
+        ]
+      ],
+      "problem": "The decision says the file belongs in `src/agents/runtime/validation.py`, but the file plan and all references still say `src/agents/graph/validation.py`.",
+      "change": "Either change every mention of the file path to `src/agents/runtime/validation.py` (file plan table, interfaces heading, and all import statements in pseudo-code), or remove the `decided:` note from `critic-items.md` C3 and add a note in the file plan explaining why `graph` is the right package despite two of three importers being in `runtime`.",
+      "status": "cannot_fix",
+      "reason": "fix not applied: would drop sections: src/agents/graph/validation.py` (new)",
+      "round": 2,
+      "decision": "The validation module belongs in `src/agents/runtime/validation.py` rather than `src/agents/graph/validation.py` because two of the three files that import it (`server.py` and `orders.py`) are in the `runtime` package, and separating data validation from graph execution logic keeps responsibilities clear.",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "The file plan and every interface and pseudo-code section name the new file as `src/agents/graph/validation.py`, but the decision recorded in `critic-items.md` says it belongs in `src/agents/runtime/validation.py`. Dev would create the file in `graph` as the plan says, and the imports in `server.py` and `orders.py` would fail because they are told to import from `graph` but the decision says the file should be in `runtime`.",
+      "trail": [
+        "round 1: raised (blocking)",
+        "round 1: the fixer decided: The validation module belongs in `src/agents/runtime/` rather than `src/agents/graph/` because two of the three files that import it (`server.py` and `orders.py`) are in the `runtime` package, and separating data validation from graph execution logic keeps responsibilities clear. The `graph` package handles state transitions and node orchestration; the `runtime` package handles HTTP and queue entry points where input validation occurs.",
+        "round 1: cannot fix: fix not applied: would drop sections: src/agents/graph/validation.py` (new)",
+        "round 2: raised again (blocking)",
+        "round 2: the fixer decided: The validation module belongs in `src/agents/runtime/validation.py` rather than `src/agents/graph/validation.py` because two of the three files that import it (`server.py` and `orders.py`) are in the `runtime` package, and separating data validation from graph execution logic keeps responsibilities clear.",
+        "round 2: cannot fix: fix not applied: would drop sections: src/agents/graph/validation.py` (new)"
+      ]
+    }
+  ]
+}
