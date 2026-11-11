@@ -1,0 +1,98 @@
+{
+  "items": [
+    {
+      "id": "C1",
+      "file": "requirements.md",
+      "section": "## Acceptance Criteria",
+      "quote": "",
+      "match": [],
+      "problem": "",
+      "change": "",
+      "status": "open",
+      "reason": "",
+      "round": 3,
+      "decision": "The ticket says \"waiting for input\" and \"waiting for review\" but the existing State in states.py uses `needs_input` and `needs_review`. The API will normalize these terms: it accepts both forms in query parameters (mapping \"waiting for input\" \u2192 `needs_input`, \"waiting for review\" \u2192 `needs_review`) but always returns the normalized `needs_input`/`needs_review` in responses. This keeps the implementation aligned with the existing codebase while honoring the ticket's language.",
+      "severity": "blocking"
+    },
+    {
+      "id": "C2",
+      "file": "stories/02-agent.md",
+      "section": "## Algorithm Notes \u203a `save_case",
+      "quote": "",
+      "match": [],
+      "problem": "The story's extraction logic uses a **different order** than the real function. The story says:\n```python\nstate.get('service_order', {}).get('subjectEmployee', {}).get('fullName') or state.get('service_order', {}).get('subject_employee', {}).get('full_name')\n```\nThis tries `subjectEmployee.fullName` first, and only falls back to `subject_employee.full_name` if the first chain returned a falsy value (including `{}`). But the **real function** in `backend.py` first resolves **which key exists** (`subjectEmployee` or `subject_employee`), then tries both name keys on that one object. The story's logic would fail if `service_order = {'subjectEmployee': {}}` (no `fullName`), because the first chain returns `{}` (truthy), so the `or` never tries the snake_case fallback.",
+      "change": "",
+      "status": "open",
+      "reason": "",
+      "round": 3,
+      "decision": "",
+      "severity": "blocking"
+    },
+    {
+      "id": "C3",
+      "file": "stories/02-agent.md",
+      "section": "## Dependencies",
+      "quote": "",
+      "match": [],
+      "problem": "This note says the logic \"matches the exact structure\" of `backend.employee_name`, but the algorithm in the same file (see C2 above) uses a different order that would fail in the `subjectEmployee` exists but has no `fullName` case. The note is wrong either way: if the algorithm is right (handles snake_case), the note should say \"extends\" not \"matches\"; if the note is right (matches exactly), the algorithm is wrong.",
+      "change": "",
+      "status": "open",
+      "reason": "",
+      "round": 3,
+      "decision": "",
+      "severity": "blocking"
+    },
+    {
+      "id": "C4",
+      "file": "breakdown.md",
+      "section": "## Stories (Build Order) \u203a Story 4",
+      "quote": "`employee_name` is derived via `backend.employee_name(state.get('service_order'))` inside `save_case`.",
+      "match": [
+        [
+          "stories/02-agent.md",
+          "## Algorithm Notes \u203a `save_case"
+        ]
+      ],
+      "problem": "The breakdown says `employee_name` is derived via `backend.employee_name(...)`, but Story 2's algorithm (C2) shows it is extracted inline without calling that function. The breakdown and the story LLD disagree on how the field is populated.",
+      "change": "In the breakdown, change the note to match the story: \"`employee_name` is extracted directly from `state['service_order']['subjectEmployee']['fullName']` inside `save_case` (see Story 2 algorithm notes).\"",
+      "status": "fixed",
+      "reason": "",
+      "round": 2,
+      "decision": "",
+      "severity": "blocking"
+    },
+    {
+      "id": "C5",
+      "file": "stories/04-agent.md",
+      "section": "## Algorithm Notes \u203a Checkpointer Hook Registration",
+      "quote": "LangGraph's `AsyncSqliteSaver` and `InMemorySaver` do not natively support write hooks as of LangGraph 1.2.11. Instead, wrap the checkpointer's `aput` method",
+      "match": [
+        [
+          "stories/04-agent.md",
+          "## Interfaces \u203a `get_checkpointer_with_hook` docstring says \"attach on_checkpoint_write hook\" but the algorithm notes say wrap `aput` instead"
+        ]
+      ],
+      "problem": "The interface docstring for `get_checkpointer_with_hook` says it attaches an `on_checkpoint_write` hook, which sounds like a native LangGraph feature, but the algorithm notes explain that LangGraph 1.2.11 doesn't have that feature and you have to wrap the `aput` method instead. The developer would read the interface and think they can call `saver.on_checkpoint_write = _hook`, but the algorithm notes contradict that by saying to wrap `aput`. They would try the native-looking approach first, fail, then read the algorithm notes and realize the interface was misleading.",
+      "change": "Rewrite the `get_checkpointer_with_hook` docstring to say \"Wraps the checkpointer's `aput` method to call `repository.save_case` after each write\" instead of \"attaches hook\". The algorithm notes already explain the wrapping approach, so the interface should match it.",
+      "status": "fixed",
+      "reason": "",
+      "round": 1,
+      "decision": "",
+      "severity": "blocking"
+    },
+    {
+      "id": "C6",
+      "file": "stories/05-agent.md",
+      "section": "## Algorithm Notes \u203a Modified `_snapshot` Function",
+      "quote": "async with open_graph(thread_id) as graph:",
+      "match": [],
+      "problem": "The existing `open_graph` function takes an optional `checkpointer_kind` parameter (default `\"memory\"`), but the story's `_snapshot` implementation calls `open_graph(thread_id)` without specifying which checkpointer to use. If the server is running with `checkpointer_kind=\"sqlite\"` (which the HLD suggests as an option), the fallback would open a different checkpointer than the one the run is actually using, so it wouldn't find the run's state and would incorrectly fall back to SQLite even when the checkpointer has the data.",
+      "change": "In Story 5's `_snapshot` algorithm notes, pass the same `checkpointer_kind` that the server is configured to use. Either add a global variable `CHECKPOINTER_KIND` that `_snapshot` reads, or pass `checkpointer_kind` as a parameter to `_snapshot` (which the route handlers already know from the server's startup config). Document how `_snapshot` knows which checkpointer the run is using.\n---",
+      "status": "fixed",
+      "reason": "",
+      "round": 1,
+      "decision": "The server's checkpointer kind is configured via the `CHECKPOINTER` environment variable (default `\"sqlite\"`), and `_snapshot` uses this same configuration when opening the graph. The run's checkpointer database is `run_dir(thread_id) / \"checkpoint.db\"` (same as what `runner.py` uses), and the persistence fallback reads from the project-wide `data/cases.db` via `repository.load_case`.",
+      "severity": "blocking"
+    }
+  ]
+}
