@@ -1,0 +1,302 @@
+{
+  "items": [
+    {
+      "id": "C1",
+      "file": "stories/01-agent.md",
+      "section": "## File Plan",
+      "quote": "Add `type: NotRequired[str]`, `by: NotRequired[str]`, and `reason: NotRequired[str]` fields to `StepRecord` TypedDict (after line ~97, before `plan`):",
+      "match": [],
+      "problem": "The file plan says \"after line ~97, before `plan`\" but `StepRecord` ends at line 45 and the `plan` field is in `State` (line 97), not in `StepRecord`.",
+      "change": "Say \"after line ~45, after the existing `pipeline` field\" or \"Add three new `NotRequired` fields to `StepRecord` TypedDict (after the existing fields, before the closing)\".\n---",
+      "status": "gate_note",
+      "reason": "raised new in a re-check, about text no fix changed since it was read",
+      "round": 2,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "The `StepRecord` TypedDict shown in `repo-file/agent/src/agents/graph/states.py` ends at line 45, and the fields listed come before `plan` at line 97, which is in the `State` TypedDict, not `StepRecord`. Dev would look for line 97 in the wrong class and either fail to find the right location or put the fields in the wrong TypedDict.",
+      "trail": [
+        "round 2: raised (blocking)",
+        "round 2: gate note: raised new in a re-check, about text no fix changed since it was read"
+      ]
+    },
+    {
+      "id": "C2",
+      "file": "stories/01-agent.md",
+      "section": "## File Plan",
+      "quote": "The modification to `StepRecord` is simpler and follows the pattern of other `NotRequired` fields already present (e.g. `result`, `evidence`, `rule`).",
+      "match": [],
+      "problem": "The LLD says the new fields follow the pattern of `NotRequired` fields like `result`, `evidence`, `rule`, but omits `feed` and `pipeline` from the list. The list is incomplete or unclear whether it's exhaustive.",
+      "change": "Say \"follows the pattern of other `NotRequired` fields already present (`result`, `evidence`, `feed`, `rule`, `pipeline`)\" or \"follows the pattern of other `NotRequired` fields (e.g. `result`, `evidence`, `rule`)\" with \"e.g.\" to show it's not exhaustive.\n---",
+      "status": "gate_note",
+      "reason": "raised new in a re-check, about text no fix changed since it was read",
+      "round": 2,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "The existing `StepRecord` fields shown in `repo-file` are `stage`, `agent`, `title`, `source`, `at` (all required), then `result`, `evidence`, `feed`, `rule`, `pipeline` (all `NotRequired`). Dev would add `type`, `by`, `reason` as additional `NotRequired` fields after these. However, the `feed` field (line 42) is also `NotRequired` but is not mentioned in the LLD's list of examples. If the pattern includes all `NotRequired` fields, the list should be complete; if it's just examples, it should say \"e.g.\" more clearly.",
+      "trail": [
+        "round 2: raised (blocking)",
+        "round 2: gate note: raised new in a re-check, about text no fix changed since it was read"
+      ]
+    },
+    {
+      "id": "C3",
+      "file": "stories/02-agent.md",
+      "section": "## File Plan",
+      "quote": "1. Add imports (after line ~19, with other imports):",
+      "match": [],
+      "problem": "The file plan says \"after line ~19, with other imports\" but line 19 is mid-import-block, and imports end around line 31. The new imports should go after line 31.",
+      "change": "Say \"after line ~31, after the existing imports\" or \"Add imports at the top (after the existing imports)\".\n---",
+      "status": "fixed",
+      "reason": "not raised again in round 3 (after the fix)",
+      "round": 2,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "repo-file/agent/src/agents/runtime/server.py` shows imports ending around line 31 (`from agents.runtime.runner import _setup_logging, open_graph, run_query`), not line 19. Line 19 is in the middle of the imports (`from typing import Any, Literal`). Dev would place the new imports after line 19 (mid-block) instead of after line 31 (end of imports), breaking Python's import grouping convention.",
+      "trail": [
+        "round 2: raised (blocking)",
+        "round 2: applied: fix applied to `stories/02-agent.md`",
+        "round 3: fixed: not raised again in round 3 (after the fix)"
+      ]
+    },
+    {
+      "id": "C4",
+      "file": "stories/01-agent.md",
+      "section": "## Interfaces",
+      "quote": "history_entry[\"type\"] = \"withdrawn\"",
+      "match": [],
+      "problem": "The history entry schema in Story 1 extends `StepRecord` with `type`, `by`, `reason` fields that are not in the `StepRecord` TypedDict definition. The code casts to `dict[str, Any]` or suppresses mypy, but the breakdown and HLD don't say whether `StepRecord` should be extended or whether the withdrawal entry is a different shape.",
+      "change": "Either add `type: NotRequired[str]`, `by: NotRequired[str]`, `reason: NotRequired[str]` to the `StepRecord` TypedDict in `states.py` (Story 1 modifies it), or define a separate `WithdrawalHistoryEntry` TypedDict and append that instead of a `StepRecord`. The LLD should pick one and show the change to `states.py`.",
+      "status": "fixed",
+      "reason": "not raised again in round 2 (after the fix)",
+      "round": 1,
+      "decision": "Extend the existing `StepRecord` TypedDict in `states.py` with `type: NotRequired[str]`, `by: NotRequired[str]`, and `reason: NotRequired[str]` fields, rather than defining a separate `WithdrawalHistoryEntry` type. This keeps all history entries as one type (`list[StepRecord]`), avoiding runtime type narrowing and simplifying console display. The withdrawal code sets these fields when appending its entry; other steps leave them absent.",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "Story 1 adds `type`, `by`, and `reason` fields to the withdrawal history entry by setting them on a `StepRecord` dict at runtime, with `# type: ignore[typeddict-unknown-key]` comments. But `StepRecord` is defined in `states.py` (shown in repo-outline) with a fixed set of fields, and TypedDict does not allow extra keys at runtime in strict mode. Dev would write the code as shown, then mypy (if enabled) or a runtime check would fail.",
+      "trail": [
+        "round 1: raised (blocking)",
+        "round 1: the fixer decided: Extend the existing `StepRecord` TypedDict in `states.py` with `type: NotRequired[str]`, `by: NotRequired[str]`, and `reason: NotRequired[str]` fields, rather than defining a separate `WithdrawalHistoryEntry` type. This keeps all history entries as one type (`list[StepRecord]`), avoiding runtime type narrowing and simplifying console display. The withdrawal code sets these fields when appending its entry; other steps leave them absent.",
+        "round 1: applied: fix applied to `stories/01-agent.md`",
+        "round 2: fixed: not raised again in round 2 (after the fix)"
+      ]
+    },
+    {
+      "id": "C4",
+      "file": "stories/02-agent.md",
+      "section": "## File Plan",
+      "quote": "3. Add `POST /runs/{thread_id}/withdraw` route (after `resume_run` endpoint, around line ~150):",
+      "match": [],
+      "problem": "The file plan says \"after `resume_run` endpoint, around line ~150\" but `resume_run` ends at line 148, and line 150 is the blank line before `get_run` starts at line 151. Saying \"around line 150\" implies inside that blank line or at the start of `get_run`.",
+      "change": "Say \"after `resume_run` endpoint (after line ~148, before `get_run`)\" or \"Add a new route between `resume_run` and `get_run`\".\n---",
+      "status": "fixed",
+      "reason": "not raised again in round 3 (after the fix)",
+      "round": 2,
+      "decision": "The HLD's API contract uses `{\"error\": \"<message>\"}` for all error responses. FastAPI's default `HTTPException` returns `{\"detail\": \"<message>\"}`. This story adds a custom exception handler in `src/agents/runtime/server.py` to transform all `HTTPException` responses to the HLD format `{\"error\": \"<message>\"}`. This handler is added after the `_lifespan` function (around line ~75) and before the route definitions, ensuring all endpoints (including the new withdrawal route) return errors in the HLD-specified format.",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "The `resume_run` endpoint in `repo-file/agent/src/agents/runtime/server.py` ends at line 148. Line 150 is inside the `get_run` endpoint definition (line 151 starts `async def get_run`). Dev would insert the new route inside `get_run` instead of between `resume_run` and `get_run`.",
+      "trail": [
+        "round 1: raised (blocking)",
+        "round 1: the fixer decided: The HLD's API contract will be updated to use `{\"error\": \"<message>\"}` for all error responses, requiring a custom FastAPI exception handler in this story. This aligns with the HLD's existing examples and ensures consistency across the API surface. The handler will be added to `src/agents/runtime/server.py` before the route definitions.",
+        "round 1: applied: fix applied to `stories/02-agent.md`",
+        "round 2: raised again (blocking)",
+        "round 2: the fixer decided: The HLD's API contract uses `{\"error\": \"<message>\"}` for all error responses. FastAPI's default `HTTPException` returns `{\"detail\": \"<message>\"}`. This story adds a custom exception handler in `src/agents/runtime/server.py` to transform all `HTTPException` responses to the HLD format `{\"error\": \"<message>\"}`. This handler is added after the `_lifespan` function (around line ~75) and before the route definitions, ensuring all endpoints (including the new withdrawal route) return errors in the HLD-specified format.",
+        "round 2: applied: fix applied to `stories/02-agent.md`",
+        "round 3: fixed: not raised again in round 3 (after the fix)"
+      ]
+    },
+    {
+      "id": "C5",
+      "file": "stories/02-agent.md",
+      "section": "## Interfaces",
+      "quote": "Response (200 OK):**\n```json\n{\n\"status\": \"withdrawn\",\n\"reason\": \"Duplicate of SO-1003\",\n\"withdrawn_at\": \"2026-10-15T14:32:00Z\"\n}\n```",
+      "match": [
+        [
+          "hld.md",
+          "## Component Interaction \u203a Withdrawal Endpoint (API)"
+        ]
+      ],
+      "problem": "(No problem \u2014 checked and consistent.)",
+      "change": "(No change needed.)\n---",
+      "status": "fixed",
+      "reason": "not raised again in round 3 (after the fix)",
+      "round": 2,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": false,
+      "blocks_because": "The HLD's API contract shows the error responses as `{\"error\": \"<message>\"}`, but the success response shown here uses the keys `status`, `reason`, `withdrawn_at` directly (no wrapping key). The endpoint implementation in the File Plan returns `result` (from `withdraw_case`), which is `{\"status\": \"withdrawn\", \"reason\": \"<trimmed>\", \"withdrawn_at\": \"<timestamp>\"}`. Dev would build this as written, but if FastAPI's response model or a middleware wraps it differently, the actual response shape could differ. The HLD and LLD agree on this shape, so this is fine unless there's an implicit wrapping.",
+      "trail": [
+        "round 2: raised (blocking)",
+        "round 2: applied: fix applied to `stories/02-agent.md`",
+        "round 3: fixed: not raised again in round 3 (after the fix)"
+      ]
+    },
+    {
+      "id": "C6",
+      "file": "stories/02-agent.md",
+      "section": "## Tests Section",
+      "quote": "Test 1: Successful withdrawal from `needs_input`**\n```python\n@pytest.mark.asyncio\nasync def test_withdraw_from_needs_input_returns_200(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None\n\"\"\"AC 1: A case waiting for flag answers can be withdrawn via API, returns 200 OK.\"\"\"\nthread_id = \"test-api-1\"",
+      "match": [],
+      "problem": "",
+      "change": "",
+      "status": "gate_note",
+      "reason": "the critic gave no reason it blocks (no `blocks because`)",
+      "round": 2,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": false,
+      "blocks_because": "",
+      "trail": [
+        "round 2: raised (blocking)",
+        "round 2: gate note: the critic gave no reason it blocks (no `blocks because`)"
+      ]
+    },
+    {
+      "id": "C7",
+      "file": "stories/07-agent.md",
+      "section": "## File Plan",
+      "quote": "No changes to `resume_service_order`:**\nStory 4 already added the withdrawn check to `resume_service_order` (around line 93). That check reads the state from the checkpointer before calling `_run`, and if `status == \"withdrawn\"`, it skips graph invocation and writes the queue status as `\"withdrawn\"` (not `\"failed\"`). The existing implementation from Story 4 handles resume operations on withdrawn cases; this story (Story 7) does not modify `resume_service_order`.",
+      "match": [
+        [
+          "stories/04-agent.md",
+          "## File Plan \u203a Modified Files \u203a src/agents/queue/orders.py"
+        ]
+      ],
+      "problem": "Story 4's file plan adds the withdrawn check to `resume_service_order`, and Story 7 correctly states \"no changes\" to that function. The division of labor is clear: Story 4 handles resume (queue + API both delegate to the queue handler's check), Story 7 handles start/approve/reject. This is now consistent.",
+      "change": "(No change needed \u2014 the clarification was made.)\n---",
+      "status": "gate_note",
+      "reason": "the critic marked it a note, not a blocker",
+      "round": 2,
+      "decision": "",
+      "severity": "note",
+      "code_claim": true,
+      "blocks_because": "(Not blocking \u2014 this is consistent now, as requested in C3 from the last review.)",
+      "trail": [
+        "round 1: raised (blocking)",
+        "round 1: applied: fix applied to `stories/07-agent.md`",
+        "round 2: raised again (note)",
+        "round 2: gate note: the critic marked it a note, not a blocker"
+      ]
+    },
+    {
+      "id": "C8",
+      "file": "stories/03-agent.md",
+      "section": "## File Plan",
+      "quote": "Imports:**\n```python\nfrom __future__ import annotations\nimport argparse\nimport asyncio\nimport logging\nimport os\nimport sys\nfrom pathlib import Path",
+      "match": [],
+      "problem": "",
+      "change": "",
+      "status": "gate_note",
+      "reason": "raised new in a re-check, about text no fix changed since it was read",
+      "round": 2,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": false,
+      "blocks_because": "",
+      "trail": [
+        "round 2: raised (blocking)",
+        "round 2: gate note: raised new in a re-check, about text no fix changed since it was read"
+      ]
+    },
+    {
+      "id": "C9",
+      "file": "stories/04-agent.md",
+      "section": "## File Plan",
+      "quote": "async def resume_service_order(ctx: dict, job: dict) -> dict[str, Any]:",
+      "match": [],
+      "problem": "Story 4's LLD adds a withdrawn status check to `resume_service_order` (lines 93-98 in the existing code become a much larger block with checkpointer reads and status checking). Story 7's breakdown says it \"modifies `resume_service_order`\" but Story 7's LLD says \"**No changes to `resume_service_order`:** Story 4 already added the withdrawn check\" in the \"Modified Files\" section. The division is unclear: if Story 4 owns the resume withdrawn check, Story 7 should not list `resume_service_order` in its breakdown; if Story 7 owns preventing all operations, Story 4 should only handle the queue status write when already withdrawn, not the operation prevention.",
+      "change": "Clarify in Story 4's LLD whether it adds the full withdrawn check to `resume_service_order` (as the code shows) or only the queue status write (deferring the check to Story 7). Update Story 7's breakdown and LLD to match: either remove `resume_service_order` from Story 7's file list (if Story 4 owns it) or move the check from Story 4 to Story 7 (if Story 7 owns operation prevention).\n---",
+      "status": "open",
+      "reason": "raised in the last read; no fix round was left",
+      "round": 3,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "Dev would add withdrawal checking code to `resume_service_order` when Story 4's purpose is to add that check, but the breakdown says Story 7 handles \"prevent operations on withdrawn cases\" and its LLD modifies `resume_service_order` again. Two stories would modify the same function for overlapping purposes, so Dev would either apply both changes (duplicating the check) or skip one, leaving gaps.",
+      "trail": [
+        "round 1: raised (blocking)",
+        "round 1: stale: the quoted text is in no spec file (not in `stories/04-agent.md` now)",
+        "round 3: raised again (blocking)",
+        "round 3: open: raised in the last read; no fix round was left"
+      ]
+    },
+    {
+      "id": "C10",
+      "file": "breakdown.md",
+      "section": "## Summary",
+      "quote": "Total test count:** 31 tests (10 + 7 + 5 + 2 + 2 + 1 + 4 + 5 = 36 tests across all stories)",
+      "match": [
+        [
+          "breakdown.md",
+          "## Summary"
+        ]
+      ],
+      "problem": "The summary line says \"31 tests\" but the addition \"(10 + 7 + 5 + 2 + 2 + 1 + 4 + 5 = 36 tests)\" gives 36. One is wrong.",
+      "change": "Recalculate the test count from the stories' test sections and update the summary to match. If the stories deliver 36 tests, say \"36 tests (10 + 7 + 5 + 2 + 2 + 1 + 4 + 5)\". If they deliver 31, correct the addition.\n---",
+      "status": "gate_note",
+      "reason": "raised new in a re-check, about text no fix changed since it was read",
+      "round": 3,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": false,
+      "blocks_because": "The breakdown says 31 tests in the summary sentence but the addition gives 36, so Dev would write 31 tests (trusting the summary) and miss 5, or write 36 and wonder which 5 to drop. Either way the test count would not match what the stories deliver.",
+      "trail": [
+        "round 3: raised (blocking)",
+        "round 3: gate note: raised new in a re-check, about text no fix changed since it was read"
+      ]
+    },
+    {
+      "id": "C11",
+      "file": "stories/06-agent.md",
+      "section": "## Tests Section",
+      "quote": "async def test_withdrawn_case_persists_across_restart() -> None:",
+      "match": [
+        [
+          "stories/06-agent.md",
+          "## File Plan"
+        ]
+      ],
+      "problem": "The LLD repeats the full test implementation twice: once in the \"File Plan\" section (under `tests/test_withdrawal_persistence.py`) and again in the \"Tests Section\". The text is identical. A developer following the LLD would see the test body in the File Plan, write it, then reach the Tests Section and see the same test quoted in full with `# (full implementation above in File Plan)` in the docstring but the body still present below it.",
+      "change": "In the \"Tests Section\", replace the full test implementation with a reference: `(See File Plan for full implementation)` and remove the test body. The File Plan already shows the complete test; the Tests Section should only describe coverage and assertions, not repeat the code.\n---",
+      "status": "gate_note",
+      "reason": "raised new in a re-check, about text no fix changed since it was read",
+      "round": 3,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "The story's purpose is \"Persistence across restarts\" and it creates a new test file `tests/test_withdrawal_persistence.py`, but the test implementation in the \"Tests Section\" shows the full test body while the \"File Plan\" section says the same test file contains the same test. Dev would write the test file once (in the File Plan section) and then see the test body again in the Tests Section and either duplicate it or skip the Tests Section, not knowing which is the source of truth.",
+      "trail": [
+        "round 3: raised (blocking)",
+        "round 3: gate note: raised new in a re-check, about text no fix changed since it was read"
+      ]
+    },
+    {
+      "id": "C12",
+      "file": "stories/08-agent.md",
+      "section": "## File Plan",
+      "quote": "async def test_example_1_duplicate_case_withdrawn_flags_not_answered() -> None:",
+      "match": [
+        [
+          "stories/08-agent.md",
+          "## Tests Section"
+        ]
+      ],
+      "problem": "The File Plan section of Story 8 contains the full implementations of all 5 tests inside the test file `tests/test_withdrawal_e2e.py`. The Tests Section then repeats the same 5 tests in full (with `# (full implementation above in File Plan)` in each docstring but the entire test body still shown). This is the same pattern as C11.",
+      "change": "In the \"Tests Section\", replace each full test implementation with a reference: `(See File Plan for full implementation)` and remove the test bodies. Only the coverage and assertions descriptions belong in the Tests Section; the code is already in the File Plan.\n---",
+      "status": "gate_note",
+      "reason": "raised new in a re-check, about text no fix changed since it was read",
+      "round": 3,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "Same issue as C11: the LLD shows each test's full implementation in the File Plan section, then repeats the full implementation in the Tests Section with a comment `# (full implementation above in File Plan)`. Dev would write the tests once in the File Plan, then see the same code in the Tests Section and either duplicate them or skip the section, not knowing the Tests Section is only documentation.",
+      "trail": [
+        "round 3: raised (blocking)",
+        "round 3: gate note: raised new in a re-check, about text no fix changed since it was read"
+      ]
+    }
+  ]
+}

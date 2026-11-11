@@ -12,17 +12,17 @@ Adds a withdraw operation for paused cases with validation, persistence, and int
 
 ## Steps
 
-1. [ ] **analyst (requirements)** — Clear acceptance criteria are provided; requirements extraction confirms scope and edge cases.
+1. [x] **analyst (requirements)** — Clear acceptance criteria are provided; requirements extraction confirms scope and edge cases.
    - focus: Focus on the validation rules (empty reason check), state transitions (what states allow withdrawal, what state it moves to), persistence requirements, and integration points (CLI, API, queue handler, console notification).
-2. [ ] **architect (hld)** — Adds a new operation affecting domain model, API contract, CLI interface, queue handling, and external integration; needs component interaction design.
+2. [x] **architect (hld)** — Adds a new operation affecting domain model, API contract, CLI interface, queue handling, and external integration; needs component interaction design.
    - focus: Design the withdrawal operation's place in the domain model, the API endpoint contract, CLI command interface, queue message handling when a case is withdrawn, persistence schema changes if needed, and console notification contract.
-3. [ ] **scrum_master (breakdown)** — Work spans multiple areas: domain model changes, API endpoint, CLI command, queue handler updates, persistence layer, and console integration; natural breakdown into stories.
+3. [x] **scrum_master (breakdown)** — Work spans multiple areas: domain model changes, API endpoint, CLI command, queue handler updates, persistence layer, and console integration; natural breakdown into stories.
    - focus: Split by technical area: domain model and business logic, API endpoint, CLI command, queue handler updates, persistence, console notification, and end-to-end validation.
-4. [ ] **designer (lld)** — Each story needs file-level implementation detail for the domain logic, API routing, CLI parsing, queue handling, and database operations.
+4. [x] **designer (lld)** — Each story needs file-level implementation detail for the domain logic, API routing, CLI parsing, queue handling, and database operations.
    - focus: Provide concrete file plans showing which modules handle state validation, where the withdrawal logic lives, how the API and CLI commands are structured, and where persistence changes go.
-5. [ ] **test_architect (tests)** — Many edge cases stated in AC: validation rules, state transitions, persistence across restarts, queue behavior, console notification failure handling.
+5. [x] **test_architect (tests)** — Many edge cases stated in AC: validation rules, state transitions, persistence across restarts, queue behavior, console notification failure handling.
    - focus: Map each AC to concrete test cases, especially the state transition rules (AC 6, 8, 9), validation (AC 2), persistence (AC 7), and queue integration (AC 11).
-6. [ ] **merge_pack (pack)** _(auto)_ — Loop feature_with_architecture: Deterministic merged_plan.md from ordered specs and story summaries.
+6. [x] **merge_pack (pack)** _(auto)_ — Loop feature_with_architecture: Deterministic merged_plan.md from ordered specs and story summaries.
 7. [ ] **critic (consistency_check)** — Multiple documents (requirements, HLD, breakdown, stories with tests) must agree on state transitions, validation rules, API contract, and integration points.
    - focus: Verify consistency of withdrawal state transitions, reason validation rules, and integration contracts across all documents.
 8. [ ] **architect_gate (review)** _(auto)_ — Human approval of specs and this plan before Dev.
