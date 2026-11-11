@@ -1,0 +1,169 @@
+{
+  "schema_version": 1,
+  "key": "PER-234",
+  "source": "llm",
+  "summary": "Adding reviewer-set priority with reason to existing cases; changes the case data model (new fields), case retrieval (show reviewer priority), and adds a new action (set priority API/command), so it needs HLD and designer for file-level planning.",
+  "track_hint": "standard",
+  "loop": "feature_with_architecture",
+  "delivery": "delivery",
+  "pr_fix": [
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "loops": [
+    "feature_with_architecture",
+    "delivery",
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "steps": [
+    {
+      "node": "analyst",
+      "activity": "requirements",
+      "why": "Extract concrete requirements from the ticket's ACs.",
+      "instructions": "Focus on the data model changes (reviewer-set priority, reason, timestamp), the new action (set priority), validation rules, and state persistence.",
+      "auto": false,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "architect",
+      "activity": "hld",
+      "why": "Design the schema changes (case model additions), the set-priority interface, and how reviewer priority overrides planner priority.",
+      "instructions": "Cover the case model extension (reviewer_priority, reviewer_priority_reason, reviewer_priority_set_at, reviewer_priority_set_by), the set priority operation's interface and validation, priority resolution logic, history recording, and activity feed integration.",
+      "auto": false,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "scrum_master",
+      "activity": "breakdown",
+      "why": "Break down into stories: schema migration, set-priority logic, display changes, history, activity feed.",
+      "instructions": "Separate schema/model changes, business logic (set priority with validation), display updates, history tracking, and activity feed notification into implementable slices.",
+      "auto": false,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "designer",
+      "activity": "lld",
+      "why": "Provide file-level implementation plan for each story slice.",
+      "instructions": "Identify which files handle case state, case operations, validation, history, activity feed, and display formatting.",
+      "auto": false,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "test_architect",
+      "activity": "tests",
+      "why": "Map each AC to concrete test cases covering validation, state changes, and edge cases.",
+      "instructions": "Cover validation (empty reason, invalid priority), state transitions (running/done/rejected cases), persistence, priority override behavior, and history recording.",
+      "auto": false,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "merge_pack",
+      "activity": "pack",
+      "why": "Loop feature_with_architecture: Deterministic merged_plan.md from ordered specs and story summaries.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "critic",
+      "activity": "consistency_check",
+      "why": "Ensure requirements, HLD, breakdown, stories, and tests agree on the data model, validation rules, and behavior.",
+      "instructions": "",
+      "auto": false,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "architect_gate",
+      "activity": "review",
+      "why": "Human approval of specs and this plan before Dev.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "dev",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pre_pr_qa",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "open_pr",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pr_review",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "merge",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    }
+  ],
+  "skipped": [
+    {
+      "node": "tpm_gate",
+      "why": "The ticket clearly states scope (reviewer sets priority with reason, specific ACs, explicit out-of-scope items); no ambiguity needing product sign-off."
+    }
+  ],
+  "suggested_roles": [],
+  "suggested_loops": [],
+  "checks": [
+    {
+      "line": "N1",
+      "applies": false,
+      "why": "This feature adds fields to the case data model (reviewer_priority, reason, timestamps), changes case state persistence, and adds a new action (set priority operation); it is a schema and interface change requiring architecture work.",
+      "feedback_id": ""
+    }
+  ],
+  "notes": [],
+  "created_at": "2026-11-11T12:47:45.096709+00:00",
+  "version": 3,
+  "trigger": "ticket",
+  "gate": null,
+  "feedback": [],
+  "feedback_errors": [],
+  "seen_feedback_ids": [
+    "hub#30:issue-6795427959"
+  ],
+  "change_summary": "",
+  "changes": null,
+  "addressed": [],
+  "unresolved_questions": [],
+  "requires_review": true
+}

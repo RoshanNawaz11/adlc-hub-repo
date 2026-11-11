@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "key": "PER-234",
+  "source": "llm",
+  "summary": "Add reviewer-settable priority to cases with validation, persistence, history tracking and activity feed integration; this is a feature with API and schema changes that requires architecture design.",
+  "track_hint": "standard",
+  "loop": "feature_with_architecture",
+  "delivery": "delivery",
+  "pr_fix": [
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "loops": [
+    "feature_with_architecture",
+    "delivery",
+    "pr_fix_minor",
+    "pr_fix_moderate"
+  ],
+  "steps": [
+    {
+      "node": "analyst",
+      "activity": "requirements",
+      "why": "Extract clear requirements from the ticket's acceptance criteria and examples.",
+      "instructions": "Focus on the state transitions, validation rules, and the distinction between reviewer-set vs system-set priority.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "architect",
+      "activity": "hld",
+      "why": "Design the priority override mechanism, schema changes, API contract, and integration with history and activity feed.",
+      "instructions": "Address the persistence model for reviewer-set priority, the flag that distinguishes it from system priority, and the API endpoint contract.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "scrum_master",
+      "activity": "breakdown",
+      "why": "Break down into stories covering API endpoint, schema migration, history tracking, and activity feed integration.",
+      "instructions": "Separate the data model changes from the API implementation and integration work.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "designer",
+      "activity": "lld",
+      "why": "Provide file-by-file implementation plans for each story including validation logic and state handling.",
+      "instructions": "Detail the validation rules, the priority override storage, and the history entry structure.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "test_architect",
+      "activity": "tests",
+      "why": "Map test cases to each acceptance criterion, especially edge cases around validation and state transitions.",
+      "instructions": "Cover all validation failures, state transition scenarios, and persistence across restarts.",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "merge_pack",
+      "activity": "pack",
+      "why": "Loop feature_with_architecture: Deterministic merged_plan.md from ordered specs and story summaries.",
+      "instructions": "",
+      "auto": true,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "critic",
+      "activity": "consistency_check",
+      "why": "Ensure consistency between requirements, HLD, breakdown and stories on priority logic and API contract.",
+      "instructions": "",
+      "auto": false,
+      "status": "done",
+      "rerun": false
+    },
+    {
+      "node": "architect_gate",
+      "activity": "review",
+      "why": "Human approval of specs and this plan before Dev.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "dev",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pre_pr_qa",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "open_pr",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "pr_review",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    },
+    {
+      "node": "merge",
+      "activity": null,
+      "why": "Loop delivery.",
+      "instructions": "",
+      "auto": true,
+      "status": "pending",
+      "rerun": false
+    }
+  ],
+  "skipped": [
+    {
+      "node": "tpm_gate",
+      "why": "Scope and acceptance criteria are clearly stated in the ticket with concrete examples; no ambiguity requiring product sign-off."
+    }
+  ],
+  "suggested_roles": [],
+  "suggested_loops": [],
+  "checks": [
+    {
+      "line": "N1",
+      "applies": false,
+      "why": "This is not one story's worth of work inside one component with unchanged interfaces - it adds a new API endpoint, changes the case schema to store reviewer-set priority and reason, and modifies history and activity feed integration.",
+      "feedback_id": ""
+    }
+  ],
+  "notes": [
+    "attempt 1: loop feature_with_architecture is ruled out: you answered that its not-when [N1] applies (one story's worth of work inside one component, and every interface stays as it is → quick_fix or story_with_design). Pick the loop that line points to, or the next loop down whose not-when lines do not apply"
+  ],
+  "created_at": "2026-11-11T13:45:11.528439+00:00",
+  "version": 4,
+  "trigger": "ticket",
+  "gate": null,
+  "feedback": [],
+  "feedback_errors": [],
+  "seen_feedback_ids": [
+    "hub#30:issue-6795427959"
+  ],
+  "change_summary": "",
+  "changes": null,
+  "addressed": [],
+  "unresolved_questions": [],
+  "requires_review": true
+}
