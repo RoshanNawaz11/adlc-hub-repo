@@ -4,9 +4,195 @@ Execution order (1 ticket(s)):
 
 1. `PER-201` (story `01-agent`)
 
-Specs (1): `specs/1.md`
+Specs (2): `specs/PER-201.md`, `specs/1.md`
 
 ---
+
+## Spec `specs/PER-201.md`
+
+# Tech Stub — PER-201
+
+**Ticket:** Reviewers can leave notes on a case  
+**Repo:** `agent` (Python, LangGraph)  
+**Date:** 2025-01-24
+
+---
+
+## Stack
+
+- **Language:** Python 3.11+
+- **Framework:** FastAPI (HTTP API), LangGraph (stateful graph execution)
+- **State management:** `State` TypedDict in `src/agents/graph/states.py`, with annotated reducers (e.g. `operator.add` for append-only lists)
+- **Persistence:** SQLite checkpointer (default, via `src/agents/runtime/checkpointer.py`), survives service restarts
+- **Validation:** Pydantic models in `src/agents/runtime/server.py` (automatic FastAPI validation)
+- **Existing patterns:** `Flag`, `Need`, `StepRecord` already use the append-only list + merge pattern; notes follow the same structure
+
+---
+
+## Schema / API Contracts
+
+### `Note` TypedDict (new, in `src/agents/graph/states.py`)
+
+```python
+class Note(TypedDict):
+    note_id: str            # UUID
+    text: str               # 1-2000 chars
+    author: str
+    created_at: str         # ISO-8601 UTC
+```
+
+### `State` extension (in `src/agents/graph/states.py`)
+
+Add one field to the existing `State` TypedDict:
+
+```python
+notes: NotRequired[Annotated[list[Note], operator.add]]
+```
+
+- **Schema version:** Increment `schema_version` to `2` in new runs; existing runs stay at `1` and show no `notes` key.
+- **Reducer:** `operator.add` appends new notes to the existing list (same pattern as `steps`, `flags`).
+- **Graceful degradation:** UI treats missing `notes` as `[]`; no migration script.
+
+### `CreateNoteRequest` Pydantic model (new, in `src/agents/runtime/server.py`)
+
+```python
+class CreateNoteRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+    author: str
+```
+
+FastAPI validates automatically; over-limit or empty text raises 422.
+
+### POST `/runs/{thread_id}/notes` (new endpoint, in `src/agents/runtime/server.py`)
+
+**Request:**
+
+```json
+{
+  "text": "Checked with client: bonus paid separately, mismatch expected.",
+  "author": "analyst@example.com"
+}
+```
+
+**Success (201):**
+
+```json
+{
+  "note_id": "a1b2c3d4-...",
+  "text": "Checked with client: bonus paid separately, mismatch expected.",
+  "author": "analyst@example.com",
+  "created_at": "2025-01-24T12:34:56.789Z"
+}
+```
+
+**Validation error (422):**
+
+```json
+{
+  "detail": [
+    {
+      "loc": ["body", "text"],
+      "msg": "ensure this value has at most 2000 characters",
+      "type": "value_error.any_str.max_length"
+    }
+  ]
+}
+```
+
+**State error (400):**
+
+```json
+{
+  "error": "Cannot add notes to a running case"
+}
+```
+
+**Logic:**
+
+1. Load the run's latest state via `_snapshot(thread_id)` (existing helper).
+2. Validate `status in ["needs_input", "needs_review"]`; reject with 400 otherwise.
+3. Create a `Note` dict: `note_id` = new UUID, `text` and `author` from request, `created_at` = ISO-8601 UTC now.
+4. Update the graph state: `async with open_graph(thread_id) as graph: await graph.aupdate({"notes": [new_note]}, config={"configurable": {"thread_id": thread_id}})` (the `operator.add` reducer appends it).
+5. Return 201 + the created note.
+
+### GET `/runs/{thread_id}` (existing, extended)
+
+The response now includes `notes` when present (existing `_publish` helper already carries `values`):
+
+```json
+{
+  "thread_id": "thread-123",
+  "status": "needs_input",
+  "notes": [
+    {
+      "note_id": "a1b2...",
+      "text": "Checked with client: bonus paid separately.",
+      "author": "analyst@example.com",
+      "created_at": "2025-01-24T12:34:56.789Z"
+    }
+  ],
+  "flags": [...],
+  "summary": "..."
+}
+```
+
+No new code; `notes` appears in `State.values` once the field is added.
+
+---
+
+## File Touch List
+
+### Modified
+
+- **`src/agents/graph/states.py`**
+  - Add `Note` TypedDict (4 fields: `note_id`, `text`, `author`, `created_at`) after `NodeTiming`, before `merge_flags`.
+  - Add `notes: NotRequired[Annotated[list[Note], operator.add]]` to `State` (after `timings`, before `worker_results`).
+  - No schema_version increment here (it's in `runner.py`).
+
+- **`src/agents/runtime/runner.py`**
+  - In `_initial_state` function (line 94): change `"schema_version": 1` to `"schema_version": 2`.
+  - Add `"notes": []` to the initial state dict (after `"schema_version": 2`, before `"run_id": run_id`).
+
+- **`src/agents/runtime/server.py`**
+  - Add `CreateNoteRequest` Pydantic model (after `FlagAnswers`, before `_lifespan`):
+    ```python
+    class CreateNoteRequest(BaseModel):
+        text: str = Field(min_length=1, max_length=2000)
+        author: str
+    ```
+  - Add `POST /runs/{thread_id}/notes` endpoint (after `resume_run`, before `get_run`):
+    ```python
+    @app.post("/runs/{thread_id}/notes", status_code=201)
+    async def add_note(thread_id: str, req: CreateNoteRequest) -> dict[str, Any]:
+    ```
+  - Imports (new):
+    - `from uuid import uuid4` (for `note_id`)
+    - `from datetime import datetime, UTC` (for `created_at`)
+    - `from pydantic import Field` (for `min_length`, `max_length` constraints)
+    - `from agents.graph.states import Note` (the TypedDict)
+
+### New
+
+None (all changes are extensions to existing files).
+
+---
+
+## Risks
+
+| Risk | Impact | Mitigation |
+|------|--------|-----------|
+| Old runs (schema v1) crash when UI expects `notes` | High | UI treats missing `notes` as `[]`; backend already handles `NotRequired` fields gracefully (Python does not raise `KeyError` when the key is absent) |
+| Concurrent note adds on the same `thread_id` | Low | LangGraph's checkpointer serializes writes; both notes land in order (same as concurrent `steps` or `flags`) |
+| Note text over 2000 chars silently truncated | Medium | Pydantic validation rejects at the endpoint; no truncation |
+| Notes added while case is running | Medium | Endpoint validates `status` before updating; rejected with clear 400 message |
+| State update fails (checkpointer write error) | Medium | FastAPI raises 500; the note is not saved; client retries or surfaces error to user |
+| `note_id` collision (two notes share the same UUID) | Very Low | `uuid4()` has a vanishingly small collision probability (2^122 possible values); no collision handling needed |
+
+---
+
+## Open Questions
+
+None.
 
 ## Spec `specs/1.md`
 
@@ -147,7 +333,7 @@ No new code; `notes` appears in `State.values` once the field is added.
 - **`src/agents/graph/states.py`**
   - Add `Note` TypedDict (4 fields: `note_id`, `text`, `author`, `created_at`).
   - Add `notes: NotRequired[Annotated[list[Note], operator.add]]` to `State`.
-  - Increment `schema_version` default to `2` in new runs (verify where initial state is created; likely `src/agents/runtime/runner.py::_initial_state`).
+  - `src/agents/runtime/runner.py::_initial_state` (line ~116): change `'schema_version': 1` to `'schema_version': 2`.
 
 - **`src/agents/runtime/server.py`**
   - Add `CreateNoteRequest` Pydantic model (inherits `BaseModel`, two fields with `Field` constraints).
@@ -184,7 +370,7 @@ None.
 
 # Story summaries
 
-- `01-agent`: Story 01-agent: Add reviewer notes to paused cases
+- `01-agent`: Story 01-agent: Add reviewer notes to paused cases (LLD)
 
 ---
 
