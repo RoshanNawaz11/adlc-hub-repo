@@ -25,9 +25,12 @@ The single story extends the existing `State` structure (`src/agents/graph/state
 **Repo:** `agent`
 
 **Description:**  
-Extend the `State` TypedDict with a `notes` field holding an append-only list of `Note` dicts. Add a `POST /runs/{thread_id}/notes` endpoint that validates the case is paused (`status in ["needs_input", "needs_review"]`), validates note text (1–2000 chars, via Pydantic), creates a `Note` with a UUID, timestamp, and author, and updates the graph state. The existing `GET /runs/{thread_id}` endpoint already returns the full `State.values` via the `_publish` helper in `server.py`, so once `notes` is added to `State`, it appears in the response automatically—no new code is needed in the GET endpoint. Increment `schema_version` to `2` for new runs; old runs (schema v1) show no `notes` key (graceful degradation: the UI treats missing `notes` as `[]`).
+Extend the `State` TypedDict with a `notes` field holding an append-only list of `Note` dicts. Add a `POST /runs/{thread_id}/notes` endpoint that validates the case is paused (`status in ["needs_input", "needs_review"]`), validates note text (1–2000 chars, via Pydantic), creates a `Note` with a UUID, timestamp, and author, and updates the graph state. GET /runs/{id} in server.py has three return paths, all through `_publish`:
+1. Line 145: when `run["status"]` is not "running"/"failed" and `"values" in run`, it returns `_publish(run)`, using the `values` stored in `_runs` at the end of `_execute`, not the checkpointer snapshot.
+2. Line 149: when `run` exists, it returns `_publish({**run, "values": snapshot.values})`.
+3. Line 151: when there is no `run`, it returns `_publish({"values": snapshot.values, ...})`.
 
-Assumption: No code change is needed in `GET /runs/{thread_id}` to display `notes`. The endpoint's three return paths all call `_publish`, which returns `{..., "values": snapshot.values}` or `{..., "values": with_pipeline(payload["values"])}`, and `snapshot.values` is the full `State` dict from the checkpointer, so once `notes` is added to `State`, it appears in every response. The first path returns `_publish(run)` when `run["status"] not in ("running", "failed")` and `"values" in run` (line 145 of `server.py`); the second returns `_publish({**run, "values": snapshot.values})` when `run` exists (line 149); the third returns `_publish({"thread_id": ..., "values": snapshot.values, ...})` when `run` does not exist (line 151). All three paths include `snapshot.values`, which is the checkpointed `State`, and `_publish` calls `with_pipeline(payload["values"])` when `payload.get("values")` is a dict (line 35 of `server.py`), so notes appear in the response automatically once the field is added to `State`. This matches the existing pattern for `flags`, `steps`, and `summary`.
+Paths 2 and 3 return `snapshot.values`, so `notes` shows up there once it is added to `State`. For path 1, `notes` shows up only if `_execute` stores the full state in `run["values"]`. Story 1 must make sure it does, and add a test that GET returns `notes` for a completed/paused run (path 1) as well as a running one (path 2). Increment `schema_version` to `2` for new runs; old runs (schema v1) show no `notes` key (graceful degradation: the UI treats missing `notes` as `[]`).
 
 Each `Note` carries `note_id` (UUID), `text` (≤2000 chars), `author`, and `created_at` (ISO-8601 UTC). The `notes` reducer uses `operator.add` to append new notes to the existing list (same pattern as `steps` and `flags`). Notes are immutable once saved (no edit/delete), persist across pause/resume cycles and service restarts (SQLite checkpointer), and are displayed oldest-first (insertion order).
 
@@ -37,7 +40,7 @@ Each `Note` carries `note_id` (UUID), `text` (≤2000 chars), `author`, and `cre
 
 **Allowed paths:**
 - `src/agents/graph/states.py` (add `Note` TypedDict, extend `State` with `notes: NotRequired[Annotated[list[Note], operator.add]]`)
-- `src/agents/runtime/runner.py` (increment `schema_version` to `2` in `_initial_state`, add `"notes": []` to initial state dict)
+- `src/agents/runtime/runner.py` (increment `schema_version` to `2` in `_initial_state`, add `"notes": []` to initial state dict; update `_execute` to store full `values` in `_runs[thread_id]` when status is "done" or "paused")
 - `src/agents/runtime/server.py` (add `CreateNoteRequest` Pydantic model, add `POST /runs/{thread_id}/notes` endpoint; no change to `GET /runs/{thread_id}` needed—it already returns the full `State.values` via `_publish`)
 
 **Verification Approach:**
@@ -72,23 +75,26 @@ Each `Note` carries `note_id` (UUID), `text` (≤2000 chars), `author`, and `cre
 10. **Test: The created note is appended to the state's notes list**  
     Mock a paused state with `notes=[note1]`; POST valid note; load the state after; assert `notes == [note1, new_note]`.
 
-11. **Test: GET on a run with notes returns them in the state dict**  
-    Mock a state with `notes=[{"note_id": "a1", "text": "checked", "author": "analyst", "created_at": "2025-01-24T12:00:00Z"}]`; GET `/runs/{thread_id}`; assert response `values["notes"]` matches the mocked list.
+11. **Test: GET on a run with notes returns them in the state dict (path 2: running/failed run)**  
+    Mock a running state with `notes=[{"note_id": "a1", "text": "checked", "author": "analyst", "created_at": "2025-01-24T12:00:00Z"}]`; GET `/runs/{thread_id}`; assert response `values["notes"]` matches the mocked list (path 2: `run` exists, returns `snapshot.values`).
 
-12. **Test: GET on a run with no notes (schema v1) returns values without a notes key**  
+12. **Test: GET on a completed run with notes returns them (path 1: finished run in _runs)**  
+    Mock `_runs[thread_id]` with `status="done"` and `values={"notes": [note1]}`; GET `/runs/{thread_id}`; assert response `values["notes"] == [note1]` (path 1: `run["status"] not in ("running", "failed")` and `"values" in run`).
+
+13. **Test: GET on a run with no notes (schema v1) returns values without a notes key**  
     Mock a state with `schema_version=1` and no `notes` field; GET `/runs/{thread_id}`; assert `"notes" not in response["values"]`.
 
-13. **Test: Notes appear in insertion order (oldest first)**  
+14. **Test: Notes appear in insertion order (oldest first)**  
     Mock a state with `notes=[note1, note2, note3]` (distinct timestamps); GET `/runs/{thread_id}`; assert `response["values"]["notes"] == [note1, note2, note3]`.
 
-14. **Test: A finished case still shows its notes**  
+15. **Test: A finished case still shows its notes**  
     Mock a finished state (`status="done"`) with `notes=[note1]`; GET `/runs/{thread_id}`; assert `response["values"]["notes"] == [note1]`.
 
-15. **Test: Notes are shown alongside flags and summary (same state structure)**  
+16. **Test: Notes are shown alongside flags and summary (same state structure)**  
     Mock a state with `flags=[flag1]`, `summary="paused on mismatch"`, `notes=[note1]`; GET `/runs/{thread_id}`; assert all three appear in `response["values"]`.
 
-**Total tests:** 15
+**Total tests:** 16
 
 ## Closure
 
-Story 1 closes the epic: once the schema is extended, the endpoint writes notes, and the GET endpoint returns them, the feature is complete. All acceptance criteria (AC1–AC7) are covered in the single story, with 15 total tests. The verification count matches the test count in the story's LLD (to be written in the `tests` role). No new dependencies or frameworks are introduced; the feature uses the existing Python stack, FastAPI validation, and LangGraph's annotated state merging.
+Story 1 closes the epic: once the schema is extended, the endpoint writes notes, and the GET endpoint returns them, the feature is complete. All acceptance criteria (AC1–AC7) are covered in the single story, with 16 total tests. The verification count matches the test count in the story's LLD (to be written in the `tests` role). No new dependencies or frameworks are introduced; the feature uses the existing Python stack, FastAPI validation, and LangGraph's annotated state merging.
