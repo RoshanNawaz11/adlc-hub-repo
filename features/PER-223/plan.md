@@ -1,6 +1,6 @@
-# Plan — PER-223 (v2)
+# Plan — PER-223 (v3)
 
-- made from: ticket
+- made from: review feedback (plan_review)
 - source: LLM planner
 - needs plan review: yes
 - track hint: standard
@@ -8,18 +8,31 @@
 - delivery: delivery
 - PR fixes run automatically: pr_fix_minor, pr_fix_moderate (other PR comments go to a person)
 
-Input validation on case rejection reason across three entry points (console, CLI, queue); fits story_with_design because it needs a file-by-file plan for validation logic placement in existing rejection flows.
+This feature adds reason validation to case rejections across three entry points (console, CLI, queue); story_with_design fits because it affects several files in one component and needs a concrete file plan before coding.
+
+## What changed
+
+Added critic step as requested by the reviewer to ensure consistency across requirements, LLD, and test specs.
+
+
+## Feedback that informed this version
+
+- **PR comment** by RoshanNawaz11 on hub#28 `[hub#28:issue-6791757443]`: add critic to planner
+  - addressed by: Added critic step to the plan with consistency_check activity.
+- **PR comment** by RoshanNawaz11 on hub#28 `[hub#28:issue-6791891194]`: add critic to planner
+  - addressed by: Added critic step to the plan with consistency_check activity.
 
 ## Steps
 
-1. [ ] **analyst (inline_story)** — Convert the detailed acceptance criteria into Given/When/Then requirements with technical notes.
-   - focus: Focus on the three rejection entry points (console, CLI, queue) and the validation rules for the reason field. Keep the out-of-scope items clear.
-2. [ ] **designer (lld)** — Multiple entry points for rejection need a file plan showing where validation is centralized and how each path calls it.
-   - focus: Identify the console handler, CLI command, and queue processor for rejections. Show where the reason validation function lives and how each entry point uses it. Include the trim-before-save logic.
-3. [ ] **test_architect (tests)** — Five acceptance criteria with specific edge cases (empty, whitespace-only, trimming) need explicit test coverage.
-   - focus: Map tests 1:1 to the five ACs. Cover all three entry points, whitespace variations (spaces, tabs, line breaks), and the queue's paused-with-message behavior.
-4. [ ] **critic (consistency_check)** — Requirements, LLD, and tests must agree on validation rules and the three entry points.
-5. [ ] **architect_gate (review)** _(auto)_ — Human approval of specs and this plan before Dev.
+1. [ ] **analyst (inline_story)** _(rerun)_ — Convert the detailed acceptance criteria into Given/When/Then requirements with technical notes.
+   - focus: Focus on the validation rules (empty, whitespace-only, trimming) and the three rejection entry points.
+2. [ ] **designer (lld)** _(rerun)_ — Multiple entry points for rejection need a file plan showing where validation is centralized and how each path calls it.
+   - focus: Show which files handle console, CLI, and queue rejections, where the shared validation logic lives, and how trimming is applied.
+3. [ ] **test_architect (tests)** _(rerun)_ — Five acceptance criteria with specific edge cases (empty, whitespace-only, trimming) need explicit test coverage.
+   - focus: Map tests 1:1 to the ACs, covering each entry point and each invalid reason case.
+4. [ ] **critic (consistency_check)** _(rerun)_ — Requirements, LLD, and tests must agree on validation rules and the three entry points.
+   - focus: Verify that the validation logic (empty, whitespace, trimming) is described consistently across all spec documents and that all three entry points are covered.
+5. [ ] **architect_gate (review)** _(auto)_ _(rerun)_ — Human approval of specs and this plan before Dev.
 6. [ ] **dev** _(auto)_ — Loop delivery.
 7. [ ] **pre_pr_qa** _(auto)_ — Loop delivery.
 8. [ ] **open_pr** _(auto)_ — Loop delivery.
