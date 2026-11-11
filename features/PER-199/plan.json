@@ -2,7 +2,7 @@
   "schema_version": 1,
   "key": "PER-199",
   "source": "llm",
-  "summary": "Add persistent notes to paused cases: API endpoint, storage, and UI display; fits story_with_design because it adds a new endpoint and database field while staying in one repo.",
+  "summary": "Reviewer requested HLD changes; architect reruns to revise the high-level design while keeping requirements, breakdown, stories and tests.",
   "track_hint": "standard",
   "loop": "feature_with_architecture",
   "delivery": "delivery",
@@ -21,7 +21,7 @@
       "node": "analyst",
       "activity": "requirements",
       "why": "Extract precise requirements from the ticket's acceptance criteria.",
-      "instructions": "Focus on the state machine (when notes can be added), validation rules, and persistence requirements.",
+      "instructions": "",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -30,7 +30,7 @@
       "node": "architect",
       "activity": "hld",
       "why": "New API endpoint, database schema change, and case state checks require HLD.",
-      "instructions": "Design the notes storage schema, the POST endpoint contract, and how notes integrate with existing case state and retrieval.",
+      "instructions": "Revise the HLD based on reviewer feedback; keep the same scope and requirements.",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -39,7 +39,7 @@
       "node": "scrum_master",
       "activity": "breakdown",
       "why": "Work splits into storage, API, and UI display stories.",
-      "instructions": "Break down by: schema/migration, API endpoint with validation, UI integration.",
+      "instructions": "",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -48,7 +48,7 @@
       "node": "designer",
       "activity": "lld",
       "why": "Each story needs file-by-file implementation detail.",
-      "instructions": "Specify which files handle schema, validation, state checks, and rendering.",
+      "instructions": "",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -57,7 +57,7 @@
       "node": "test_architect",
       "activity": "tests",
       "why": "AC includes edge cases: empty notes, over-limit, wrong state, persistence across restarts.",
-      "instructions": "Map each AC to test cases, especially validation and state machine transitions.",
+      "instructions": "",
       "auto": false,
       "status": "done",
       "rerun": false
@@ -87,7 +87,7 @@
       "instructions": "",
       "auto": true,
       "status": "pending",
-      "rerun": false
+      "rerun": true
     },
     {
       "node": "dev",
@@ -143,17 +143,55 @@
   ],
   "suggested_roles": [],
   "suggested_loops": [],
+  "checks": [
+    {
+      "line": "N1",
+      "applies": false,
+      "why": "The work is a new API endpoint and schema change across storage, API, and UI stories, not one story inside one component.",
+      "feedback_id": ""
+    }
+  ],
   "notes": [],
-  "created_at": "2026-11-10T15:28:52.274580+00:00",
-  "version": 1,
-  "trigger": "ticket",
-  "gate": null,
-  "feedback": [],
+  "created_at": "2026-11-11T12:59:18.505738+00:00",
+  "version": 2,
+  "trigger": "review",
+  "gate": "architect_review",
+  "feedback": [
+    {
+      "id": "hub#25:issue-6796411935",
+      "source": "pr_conversation",
+      "body": "lets changes the hld",
+      "author": "RoshanNawaz11",
+      "path": null,
+      "line": null,
+      "pr": "hub#25"
+    }
+  ],
   "feedback_errors": [],
-  "seen_feedback_ids": [],
-  "change_summary": "",
-  "changes": null,
-  "addressed": [],
+  "seen_feedback_ids": [
+    "hub#25:issue-6796411935"
+  ],
+  "change_summary": "Architect reruns to revise HLD per reviewer feedback; requirements, breakdown, stories and tests remain valid.",
+  "changes": {
+    "added": [],
+    "removed": [],
+    "rerun": [
+      "architect",
+      "scrum_master",
+      "designer",
+      "test_architect",
+      "critic"
+    ],
+    "kept": [
+      "analyst"
+    ]
+  },
+  "addressed": [
+    {
+      "feedback_id": "hub#25:issue-6796411935",
+      "change": "architect reruns with focus on requested HLD changes"
+    }
+  ],
   "unresolved_questions": [],
   "requires_review": true
 }

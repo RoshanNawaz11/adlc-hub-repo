@@ -1,0 +1,13 @@
+## What would go wrong
+
+### C1
+- file: breakdown.md
+- section: ## Story 1: Add reviewer notes to paused cases
+- quote: The endpoint's three return paths all call `_publish`, which returns `{..., "values": snapshot.values}` or `{..., "values": with_pipeline(payload["values"])}`, and `snapshot.values` is the full `State` dict from the checkpointer, so once `notes` is added to `State`, it appears in every response.
+- match: repo-file/agent/src/agents/runtime/server.py › get_run
+- severity: blocking
+- blocks because: Dev would believe the GET endpoint returns `snapshot.values` directly, but the code shows it returns `_publish(run)` when `run["status"] not in ("running", "failed")` and `"values" in run` (line 145), which does not involve `snapshot` at all in that path. The breakdown's claim that all three paths use `snapshot.values` is false, so Dev would misunderstand how the endpoint works.
+- problem: The breakdown states "The endpoint's three return paths all call `_publish`, which returns `{..., "values": snapshot.values}` or `{..., "values": with_pipeline(payload["values"])}`, and `snapshot.values` is the full `State` dict from the checkpointer, so once `notes` is added to `State`, it appears in every response." But `server.py::get_run` shows the first path returns `_publish(run)` at line 145 when `run["status"] not in ("running", "failed") and "values" in run`, which uses the `run` dict from `_runs`, not `snapshot.values`. Only the second and third paths involve `snapshot` (lines 149 and 151). The claim that all three paths use `snapshot.values` is wrong.
+- change: Remove "The endpoint's three return paths all" and replace with: "Two of the GET endpoint's paths". Then clarify: "The first path (line 145 of `server.py`) returns `_publish(run)` when `run["status"] not in ("running", "failed")` and `"values" in run`, using the `run` dict from `_runs` (which was written at the end of `_execute`). The second path (line 149) returns `_publish({**run, "values": snapshot.values})` when `run` exists, and the third path (line 151) returns `_publish({"values": snapshot.values, ...})` when `run` does not exist. The second and third paths use `snapshot.values` from the checkpointer; the first uses the `run` dict that `_execute` wrote to `_runs` after the graph finished, which already contains the final `values` from `snapshot.values`. All three paths include `notes` once it is added to `State`, because every path's `values` comes from the checkpointer's `State` (either directly via `snapshot.values`, or via `_runs[thread_id]` which `_execute` wrote from the final snapshot)."
+
+VERDICT: FAIL

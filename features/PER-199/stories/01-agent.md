@@ -1,8 +1,7 @@
-# Story 01-agent: Add reviewer notes to paused cases
+# Story 01-agent: Add reviewer notes to paused cases (LLD)
 
-**Repo:** `agent`
-
-**Covers:** AC1, AC2, AC3, AC4, AC5, AC6, AC7
+**Repo:** `agent` (Python, LangGraph)  
+**Date:** 2025-01-24
 
 ---
 
@@ -76,128 +75,64 @@
 
 ### Modified Files
 
-#### `src/agents/graph/states.py`
+1. **`src/agents/graph/states.py`**
+   - Add `Note` TypedDict (4 fields: `note_id`, `text`, `author`, `created_at`) after `NodeTiming`, before `merge_flags`.
+   - Add `notes: NotRequired[Annotated[list[Note], operator.add]]` to `State` (after `timings`, before `worker_results`).
+   - No `schema_version` increment here (it's in `runner.py`).
 
-**Purpose:** Add the `Note` TypedDict and extend `State` with a `notes` field; increment `schema_version` to `2`.
-
-**Changes:**
-
-1. **Add `Note` TypedDict** (after `NodeTiming`, before `merge_flags`):
-   ```python
-   class Note(TypedDict):
-       note_id: str            # UUID
-       text: str               # 1-2000 chars
-       author: str
-       created_at: str         # ISO-8601 UTC
-   ```
-
-2. **Extend `State` TypedDict** (add field after `timings`, before `worker_results`):
-   ```python
-   notes: NotRequired[Annotated[list[Note], operator.add]]
-   ```
-   - The `operator.add` reducer appends new notes to the existing list (same pattern as `steps`, `flags`).
-   - `NotRequired` because schema v1 runs have no `notes` key.
-
-3. **Increment `schema_version`** default to `2` in `src/agents/runtime/runner.py::_initial_state` (verify location: currently `"schema_version": 1` on line 94).
-
-**Interfaces:**
-
-- **Exports:** `Note` (new TypedDict), `State.notes` (new field, `NotRequired[Annotated[list[Note], operator.add]]`).
-- **Imports:** No new imports (uses existing `operator`, `Annotated`, `NotRequired`, `TypedDict`).
-
----
-
-#### `src/agents/runtime/server.py`
-
-**Purpose:** Add `CreateNoteRequest` Pydantic model and `POST /runs/{thread_id}/notes` endpoint.
-
-**Changes:**
-
-1. **Add `CreateNoteRequest` Pydantic model** (after `FlagAnswers`, before `_lifespan`):
-   ```python
-   class CreateNoteRequest(BaseModel):
-       text: str = Field(min_length=1, max_length=2000)
-       author: str
-   ```
-   - Pydantic validates `text` length automatically; over-limit or empty text raises 422.
-
-2. **Add `POST /runs/{thread_id}/notes` endpoint** (after `resume_run`, before `get_run`):
-   ```python
-   @app.post("/runs/{thread_id}/notes", status_code=201)
-   async def add_note(thread_id: str, req: CreateNoteRequest) -> dict[str, Any]:
-   ```
-
-**Interfaces:**
-
-- **Imports (new):**
-  - `from uuid import uuid4` (for `note_id`)
-  - `from datetime import datetime, UTC` (for `created_at`)
-  - `from pydantic import Field` (for `min_length`, `max_length` constraints)
-  - `from agents.graph.states import Note` (the TypedDict)
-
-- **Exports:** `CreateNoteRequest` (new Pydantic model), `add_note` (new HTTP endpoint).
-
-- **Calls:**
-  - `_snapshot(thread_id)` (existing helper, loads the state from the checkpointer).
-  - `open_graph(thread_id)` (existing context manager, yields the graph with the run's checkpointer).
-  - `graph.aupdate({"notes": [new_note]}, config={"configurable": {"thread_id": thread_id}})` (LangGraph's update method; the `operator.add` reducer appends the note to `State.notes`).
-
----
-
-#### `src/agents/runtime/runner.py`
-
-**Purpose:** Increment `schema_version` to `2` in `_initial_state` for new runs.
-
-**Changes:**
-
-1. **In `_initial_state` function** (line 94):
-   - Change `"schema_version": 1` to `"schema_version": 2`.
+2. **`src/agents/runtime/runner.py`**
+   - In `_initial_state` function (line ~116): change `"schema_version": 1` to `"schema_version": 2`.
    - Add `"notes": []` to the initial state dict (after `"schema_version": 2`, before `"run_id": run_id`).
 
-**Interfaces:**
+3. **`src/agents/runtime/server.py`**
+   - Add `CreateNoteRequest` Pydantic model (after `FlagAnswers`, before `_lifespan`).
+   - Add `POST /runs/{thread_id}/notes` endpoint (after `resume_run`, before `get_run`).
+   - Imports (new):
+     - `from uuid import uuid4` (for `note_id`)
+     - `from datetime import datetime, UTC` (for `created_at`)
+     - `from pydantic import Field` (for `min_length`, `max_length` constraints)
+     - `from agents.graph.states import Note` (the TypedDict)
 
-- **No new imports or exports** (internal change to `_initial_state` return value).
-- **Contract:** New runs write `schema_version: 2` and an empty `notes: []` list; old runs loaded from the checkpointer show `schema_version: 1` and no `notes` key.
+### Test File
 
----
-
-### No New Files
-
-All changes are extensions to existing files.
-
----
+- **`tests/test_reviewer_notes.py`** (new)
+  - Covers all 15 tests listed in the Tests section below.
 
 ## Interfaces
 
-### `Note` TypedDict (new, exported from `src/agents/graph/states.py`)
+### `Note` TypedDict (new, in `src/agents/graph/states.py`)
 
 ```python
 class Note(TypedDict):
-    note_id: str            # UUID (string)
+    note_id: str            # UUID
     text: str               # 1-2000 chars
-    author: str             # reviewer identifier (email or name)
-    created_at: str         # ISO-8601 UTC timestamp
+    author: str
+    created_at: str         # ISO-8601 UTC
 ```
 
-**Usage:** Created by the `POST /runs/{thread_id}/notes` endpoint; stored in `State.notes` as an append-only list.
+### `State` extension (in `src/agents/graph/states.py`)
 
----
-
-### `State.notes` (new field in `State` TypedDict)
+Add one field to the existing `State` TypedDict:
 
 ```python
 notes: NotRequired[Annotated[list[Note], operator.add]]
 ```
 
-**Behavior:**
+- **Schema version:** `schema_version` incremented to `2` in new runs (in `runner.py::_initial_state`); existing runs stay at `1` and show no `notes` key.
+- **Reducer:** `operator.add` appends new notes to the existing list (same pattern as `steps`, `flags`).
+- **Graceful degradation:** UI treats missing `notes` as `[]`; no migration script.
 
-- **Reducer:** `operator.add` appends new notes to the existing list (insertion order preserved, oldest first).
-- **Schema version 2:** New runs initialize with `notes: []`.
-- **Schema version 1:** Old runs have no `notes` key; the UI treats missing `notes` as `[]`.
+### `CreateNoteRequest` Pydantic model (new, in `src/agents/runtime/server.py`)
 
----
+```python
+class CreateNoteRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+    author: str
+```
 
-### `POST /runs/{thread_id}/notes` (new endpoint in `src/agents/runtime/server.py`)
+FastAPI validates automatically; over-limit or empty text raises 422.
+
+### POST `/runs/{thread_id}/notes` (new endpoint, in `src/agents/runtime/server.py`)
 
 **Request:**
 
@@ -243,40 +178,15 @@ notes: NotRequired[Annotated[list[Note], operator.add]]
 
 **Logic:**
 
-1. Load the run's latest state via `_snapshot(thread_id)` (existing helper; reads from the SQLite checkpointer).
-2. Validate `status in ["needs_input", "needs_review"]`; reject with 400 + descriptive message otherwise:
-   - `status == "running"` → `"Cannot add notes to a running case"`
-   - `status == "done"` → `"Cannot add notes to a finished case"`
-   - `status == "rejected"` → `"Cannot add notes to a finished case"`
-   - `status == "failed"` → `"Cannot add notes to a finished case"`
-3. Create a `Note` dict:
-   - `note_id`: `str(uuid4())`
-   - `text`, `author`: from request body
-   - `created_at`: `datetime.now(UTC).isoformat()`
-4. Update the graph state:
-   ```python
-   async with open_graph(thread_id) as graph:
-       await graph.aupdate(
-           {"notes": [new_note]},
-           config={"configurable": {"thread_id": thread_id}}
-       )
-   ```
-   - The `operator.add` reducer in `State.notes` appends `new_note` to the existing list.
+1. Load the run's latest state via `_snapshot(thread_id)` (existing helper in `server.py`).
+2. Validate `status in ["needs_input", "needs_review"]`; reject with 400 otherwise.
+3. Create a `Note` dict: `note_id` = new UUID (via `uuid4()`), `text` and `author` from request, `created_at` = ISO-8601 UTC now (via `datetime.now(UTC).isoformat()`).
+4. Update the graph state: `async with open_graph(thread_id) as graph: await graph.aupdate({"notes": [new_note]}, config={"configurable": {"thread_id": thread_id}})` (the `operator.add` reducer appends it).
 5. Return 201 + the created note.
 
-**Error handling:**
+### GET `/runs/{thread_id}` (existing, extended)
 
-- **Pydantic validation (automatic):** Empty `text` or `text` over 2000 chars raises 422 with field-specific error message (no manual check needed).
-- **State validation (manual):** Check `status` before calling `graph.aupdate`; raise `HTTPException(400, ...)` on invalid state.
-- **Thread not found:** `_snapshot` returns a snapshot with `snapshot.values is None` if the thread does not exist; raise `HTTPException(404, f"Unknown run {thread_id}")`.
-
----
-
-### `GET /runs/{thread_id}` (existing, extended)
-
-**No new code:** The `_publish` helper already includes `values` in the response, and `values` is the full `State` dict once `notes` is added to `State`. The UI reads `notes` from `response["values"]["notes"]` (when present).
-
-**Response (extended):**
+The response now includes `notes` when present (existing `_publish` helper already carries `values`):
 
 ```json
 {
@@ -295,169 +205,485 @@ notes: NotRequired[Annotated[list[Note], operator.add]]
 }
 ```
 
-**Schema v1 runs:** `"notes"` key absent (the UI treats it as `[]`).
+No new code needed; `notes` appears in `State.values` once the field is added to `State`, and `_publish` already returns the full `values` dict.
 
 ---
 
 ## Algorithm Notes
 
-### State Validation Logic (in `POST /runs/{thread_id}/notes`)
+### Schema Version Increment
 
-```python
-snapshot = await _snapshot(thread_id)
-if not snapshot.values:
-    raise HTTPException(404, f"Unknown run {thread_id}")
+- **Where:** `src/agents/runtime/runner.py::_initial_state` (line ~94).
+- **What:** Change `"schema_version": 1` to `"schema_version": 2`, and add `"notes": []` to the initial state dict.
+- **Why:** New runs write `schema_version: 2` and an empty `notes` list; old runs (loaded from SQLite) show `schema_version: 1` and no `notes` key. The UI treats missing `notes` as `[]` (graceful degradation).
 
-status = snapshot.values.get("status")
-allowed_statuses = {"needs_input", "needs_review"}
+### Note Creation
 
-if status not in allowed_statuses:
-    if status == "running":
-        msg = "Cannot add notes to a running case"
-    else:  # "done", "rejected", "failed"
-        msg = "Cannot add notes to a finished case"
-    raise HTTPException(400, msg)
-```
+- **Where:** `src/agents/runtime/server.py::add_note` (new endpoint).
+- **What:**
+  1. Call `_snapshot(thread_id)` to load the run's latest state.
+  2. Check `snapshot.values["status"] in ["needs_input", "needs_review"]`; if not, raise `HTTPException(400, "Cannot add notes to a <status> case")`.
+  3. Create `note: Note = {"note_id": str(uuid4()), "text": req.text, "author": req.author, "created_at": datetime.now(UTC).isoformat()}`.
+  4. Call `async with open_graph(thread_id) as graph: await graph.aupdate({"notes": [note]}, config={"configurable": {"thread_id": thread_id}})`.
+  5. Return `201, note`.
+- **Why:** The `operator.add` reducer (in `State.notes`) appends `[note]` to the existing `notes` list. LangGraph's checkpointer persists the updated state to SQLite, so the note survives service restarts.
 
-**Rationale:** The `status` field is the single source of truth for whether a case is paused (and thus eligible for notes). The error message names the state to make the rejection clear.
+### Display
 
----
+- **Where:** `src/agents/runtime/server.py::get_run` (existing).
+- **What:** No code change. Once `notes` is added to `State`, `snapshot.values` (returned by `_publish`) includes `notes` if present.
+- **Why:** The existing `_publish` helper already returns `{**run, "values": snapshot.values}` or `{"values": snapshot.values, ...}`, so `notes` appears alongside `flags`, `summary`, `steps`.
 
-### Note Creation (in `POST /runs/{thread_id}/notes`)
+### Validation
 
-```python
-from datetime import UTC, datetime
-from uuid import uuid4
+- **Where:** `src/agents/runtime/server.py::CreateNoteRequest` (new Pydantic model).
+- **What:** `text: str = Field(min_length=1, max_length=2000)` and `author: str`.
+- **Why:** FastAPI's automatic validation raises 422 (with a descriptive error message) if `text` is empty or over 2000 chars, satisfying AC6.
 
-new_note: Note = {
-    "note_id": str(uuid4()),
-    "text": req.text,  # already validated by Pydantic (1-2000 chars)
-    "author": req.author,
-    "created_at": datetime.now(UTC).isoformat(),
-}
-```
+### Immutability
 
-**Rationale:** The `note_id` is a UUID to guarantee uniqueness across runs and restarts. The `created_at` timestamp is ISO-8601 UTC (same format as `StepRecord.at`), so the UI can sort notes oldest-first without timezone conversion.
-
----
-
-### Graph Update (in `POST /runs/{thread_id}/notes`)
-
-```python
-async with open_graph(thread_id) as graph:
-    await graph.aupdate(
-        {"notes": [new_note]},
-        config={"configurable": {"thread_id": thread_id}}
-    )
-```
-
-**How it works:**
-
-1. `graph.aupdate` calls the `State.notes` reducer (`operator.add`).
-2. The reducer appends `[new_note]` to the existing `notes` list (same as how `steps` and `flags` are merged).
-3. The checkpointer writes the updated state to `<run_dir>/checkpoint.db`, so the note persists across service restarts.
-
-**No race condition:** LangGraph serializes writes to the same `thread_id` (the checkpointer's `aput` method is atomic per thread). If two notes are added concurrently, both land in the list in the order the checkpointer processed them.
-
----
-
-### Schema Version Handling
-
-**New runs (schema v2):**
-
-- `_initial_state` in `src/agents/runtime/runner.py` returns `{"schema_version": 2, "notes": [], ...}`.
-- The checkpointer writes this to a new SQLite file.
-
-**Old runs (schema v1):**
-
-- Loaded from an existing SQLite checkpoint with `{"schema_version": 1, ...}` and no `notes` key.
-- The `NotRequired[...]` annotation means Python does not raise `KeyError` when `notes` is absent.
-- The `GET /runs/{thread_id}` response carries `values` as-is; the UI checks `if ("notes" in values)` or treats `values.get("notes", [])` as an empty list.
-
-**No migration script:** The schema bump is a cold-start strategy. Old runs show no `notes` field; new runs write one. The UI handles both gracefully.
-
----
-
-### Display Order (oldest first)
-
-The `operator.add` reducer preserves insertion order: the first note appended is at index 0, the second at index 1, etc. The UI renders `notes` in array order, so oldest notes appear first (no sort needed).
+- **Where:** No delete/edit endpoints are created.
+- **What:** Notes are append-only (via `operator.add` reducer); no endpoint allows editing or deleting a note.
+- **Why:** Satisfies AC2 (notes are immutable once saved).
 
 ---
 
 ## Tests
 
-The breakdown lists 15 total tests (4 + 6 + 5) across the three stories. This story (01-agent) implements all three, so it covers all 15 tests.
+### Test 1: New runs write schema_version=2 and an empty notes list
 
-### Story 1 Tests (schema, 4 total)
+**Setup:** Start a new run (no service order, or a fresh `thread_id`).  
+**Action:** Call `run_query` (or `POST /runs`), then load the state via `_snapshot`.  
+**Assert:** `snapshot.values["schema_version"] == 2` and `snapshot.values["notes"] == []`.
 
-1. **Test: New runs write schema_version=2 and an empty notes list**  
-   Start a new run with no service order; snapshot the state; assert `schema_version == 2` and `notes == []`.
+**Code:**
 
-2. **Test: Old runs (v1) loaded from checkpointer show no notes key**  
-   Mock a checkpointer returning a state with `schema_version=1` and no `notes` field; load it; assert `"notes" not in state`.
+```python
+@pytest.mark.asyncio
+async def test_new_runs_write_schema_version_2_and_empty_notes(monkeypatch: pytest.MonkeyPatch) -> None:
+    from agents.runtime.runner import _initial_state
 
-3. **Test: Note structure matches the TypedDict contract**  
-   Create a `Note` dict with all fields; assert keys are `note_id`, `text`, `author`, `created_at`; assert `note_id` is a valid UUID string; assert `text` is a string ≤2000 chars; assert `created_at` is an ISO-8601 UTC string.
-
-4. **Test: Notes reducer appends new notes to the existing list**  
-   Call the `State` annotated reducer with `current = [note1]` and `new = [note2]`; assert the result is `[note1, note2]` (insertion order preserved).
-
----
-
-### Story 2 Tests (API endpoint, 6 total)
-
-1. **Test: POST with valid text and author on a paused case returns 201 + the note**  
-   Mock a paused state (`status="needs_input"`); POST `{"text": "checked", "author": "analyst@example.com"}`; assert response is 201; assert body has `note_id` (UUID), `text`, `author`, `created_at` (ISO-8601 UTC).
-
-2. **Test: POST with empty text returns 422**  
-   POST `{"text": "", "author": "analyst"}` to a paused case; assert response is 422; assert error message mentions "text".
-
-3. **Test: POST with text over 2000 chars returns 422**  
-   POST `{"text": "x" * 2001, "author": "analyst"}` to a paused case; assert response is 422; assert error message mentions "2000 characters".
-
-4. **Test: POST to a running case returns 400 with "Cannot add notes to a running case"**  
-   Mock a running state (`status="running"`); POST valid note; assert response is 400; assert error message is "Cannot add notes to a running case".
-
-5. **Test: POST to a finished case returns 400 with "Cannot add notes to a finished case"**  
-   Mock a finished state (`status="done"`); POST valid note; assert response is 400; assert error message is "Cannot add notes to a finished case".
-
-6. **Test: The created note is appended to the state's notes list**  
-   Mock a paused state with `notes=[note1]`; POST valid note; load the state after; assert `notes == [note1, new_note]`.
+    state = _initial_state(
+        run_id="test-run",
+        query="",
+        service_order_id="SO-1003",
+        service_order={"id": "SO-1003", "caseType": "Offboarding"},
+    )
+    assert state["schema_version"] == 2
+    assert state["notes"] == []
+```
 
 ---
 
-### Story 3 Tests (UI display, 5 total)
+### Test 2: Old runs (v1) loaded from checkpointer show no notes key
 
-1. **Test: GET on a run with notes returns them in the state dict**  
-   Mock a state with `notes=[{"note_id": "a1", "text": "checked", "author": "analyst", "created_at": "2025-01-24T12:00:00Z"}]`; GET `/runs/{thread_id}`; assert response `values["notes"]` matches the mocked list.
+**Setup:** Mock `AsyncSqliteSaver` to return a state with `schema_version=1` and no `notes` field.  
+**Action:** Call `_snapshot(thread_id)`.  
+**Assert:** `"notes" not in snapshot.values`.
 
-2. **Test: GET on a run with no notes (schema v1) returns values without a notes key**  
-   Mock a state with `schema_version=1` and no `notes` field; GET `/runs/{thread_id}`; assert `"notes" not in response["values"]`.
+**Code:**
 
-3. **Test: Notes appear in insertion order (oldest first)**  
-   Mock a state with `notes=[note1, note2, note3]` (distinct timestamps); GET `/runs/{thread_id}`; assert `response["values"]["notes"] == [note1, note2, note3]`.
+```python
+@pytest.mark.asyncio
+async def test_old_runs_show_no_notes_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    mock_snapshot = MagicMock()
+    mock_snapshot.values = {"schema_version": 1, "run_id": "old-run", "status": "done"}
+    mock_snapshot.next = []
 
-4. **Test: A finished case still shows its notes**  
-   Mock a finished state (`status="done"`) with `notes=[note1]`; GET `/runs/{thread_id}`; assert `response["values"]["notes"] == [note1]`.
-
-5. **Test: Notes are shown alongside flags and summary (same state structure)**  
-   Mock a state with `flags=[flag1]`, `summary="paused on mismatch"`, `notes=[note1]`; GET `/runs/{thread_id}`; assert all three appear in `response["values"]`.
-
----
-
-## Risks
-
-| Risk | Impact | Mitigation |
-|------|--------|-----------|
-| Old runs (schema v1) crash when UI expects `notes` | High | UI treats missing `notes` as `[]`; `NotRequired` annotation in `State` means Python does not raise `KeyError` |
-| Concurrent note adds on the same `thread_id` | Low | LangGraph's checkpointer serializes writes; both notes land in order (same as concurrent `steps` or `flags`) |
-| Note text over 2000 chars silently truncated | Medium | Pydantic validation rejects at the endpoint; no truncation |
-| Notes added while case is running | Medium | Endpoint validates `status` before updating; rejected with clear 400 message |
-| State update fails (checkpointer write error) | Medium | FastAPI raises 500; the note is not saved; client retries or surfaces error to user |
-| `note_id` collision (two notes share the same UUID) | Very Low | `uuid4()` has a vanishingly small collision probability (2^122 possible values); no collision handling needed |
+    with patch("agents.runtime.server._snapshot", return_value=mock_snapshot):
+        client = TestClient(app)
+        response = client.get("/runs/old-run")
+        assert response.status_code == 200
+        assert "notes" not in response.json()["values"]
+```
 
 ---
 
-## Open Questions
+### Test 3: Note structure matches the TypedDict contract
 
-None.
+**Setup:** None.  
+**Action:** Create a `Note` dict: `{"note_id": str(uuid4()), "text": "checked", "author": "analyst", "created_at": datetime.now(UTC).isoformat()}`.  
+**Assert:**
+- Keys are exactly `{"note_id", "text", "author", "created_at"}`.
+- `note_id` is a valid UUID string (36 chars, matches UUID pattern).
+- `text` is a string, `len(text) <= 2000`.
+- `created_at` is an ISO-8601 UTC string (ends with `Z` or `+00:00`).
+
+**Code:**
+
+```python
+def test_note_structure_matches_contract() -> None:
+    note: Note = {
+        "note_id": str(uuid.uuid4()),
+        "text": "checked",
+        "author": "analyst",
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+    assert set(note.keys()) == {"note_id", "text", "author", "created_at"}
+    # UUID pattern: 8-4-4-4-12 hex digits
+    assert len(note["note_id"]) == 36
+    assert note["note_id"].count("-") == 4
+    assert len(note["text"]) <= 2000
+    assert note["created_at"].endswith("Z") or "+00:00" in note["created_at"]
+```
+
+---
+
+### Test 4: Notes reducer appends new notes to the existing list
+
+**Setup:** Mock the `State` annotated reducer for `notes` (i.e., call `operator.add`).  
+**Action:** Call the reducer with `current = [{"note_id": "n1", ...}]` and `new = [{"note_id": "n2", ...}]`.  
+**Assert:** Result is `[{"note_id": "n1", ...}, {"note_id": "n2", ...}]` (insertion order preserved).
+
+**Code:**
+
+```python
+def test_notes_reducer_appends() -> None:
+    current = [{"note_id": "n1", "text": "first", "author": "analyst1", "created_at": "2025-01-24T10:00:00Z"}]
+    new = [{"note_id": "n2", "text": "second", "author": "analyst2", "created_at": "2025-01-24T11:00:00Z"}]
+    # The State field is `notes: NotRequired[Annotated[list[Note], operator.add]]`
+    result = operator.add(current, new)
+    assert result == [
+        {"note_id": "n1", "text": "first", "author": "analyst1", "created_at": "2025-01-24T10:00:00Z"},
+        {"note_id": "n2", "text": "second", "author": "analyst2", "created_at": "2025-01-24T11:00:00Z"},
+    ]
+```
+
+---
+
+### Test 5: POST with valid text and author on a paused case returns 201 + the note
+
+**Setup:** Mock `_snapshot` to return a state with `status="needs_input"` and `notes=[]`.  
+**Action:** `POST /runs/{thread_id}/notes {"text": "checked", "author": "analyst@example.com"}`.  
+**Assert:**
+- Response status is 201.
+- Response body has keys `{"note_id", "text", "author", "created_at"}`.
+- `note_id` is a valid UUID string.
+- `text == "checked"`, `author == "analyst@example.com"`.
+- `created_at` is an ISO-8601 UTC string.
+
+**Code:**
+
+```python
+def test_post_valid_note_on_paused_case_returns_201(monkeypatch: pytest.MonkeyPatch) -> None:
+    mock_snapshot = MagicMock()
+    mock_snapshot.values = {"status": "needs_input", "notes": []}
+
+    async def mock_aupdate(self: Any, payload: dict[str, Any], config: dict[str, Any]) -> None:
+        pass
+
+    with patch("agents.runtime.server._snapshot", return_value=mock_snapshot):
+        with patch("agents.runtime.server.open_graph") as mock_graph:
+            mock_graph_instance = AsyncMock()
+            mock_graph_instance.aupdate = mock_aupdate
+            mock_graph.return_value.__aenter__.return_value = mock_graph_instance
+
+            client = TestClient(app)
+            response = client.post("/runs/test-thread/notes", json={"text": "checked", "author": "analyst@example.com"})
+            assert response.status_code == 201
+            body = response.json()
+            assert set(body.keys()) == {"note_id", "text", "author", "created_at"}
+            assert len(body["note_id"]) == 36
+            assert body["text"] == "checked"
+            assert body["author"] == "analyst@example.com"
+            assert body["created_at"].endswith("Z") or "+00:00" in body["created_at"]
+```
+
+---
+
+### Test 6: POST with empty text returns 422
+
+**Setup:** Mock `_snapshot` to return a paused state.  
+**Action:** `POST /runs/{thread_id}/notes {"text": "", "author": "analyst"}`.  
+**Assert:**
+- Response status is 422.
+- Response body `detail` includes an error mentioning `"text"` and `"min_length"` or `"ensure this value has at least 1 characters"`.
+
+**Code:**
+
+```python
+def test_post_empty_text_returns_422() -> None:
+    mock_snapshot = MagicMock()
+    mock_snapshot.values = {"status": "needs_input"}
+
+    with patch("agents.runtime.server._snapshot", return_value=mock_snapshot):
+        client = TestClient(app)
+        response = client.post("/runs/test-thread/notes", json={"text": "", "author": "analyst"})
+        assert response.status_code == 422
+        assert "text" in str(response.json()["detail"]).lower()
+```
+
+---
+
+### Test 7: POST with text over 2000 chars returns 422
+
+**Setup:** Mock `_snapshot` to return a paused state.  
+**Action:** `POST /runs/{thread_id}/notes {"text": "x" * 2001, "author": "analyst"}`.  
+**Assert:**
+- Response status is 422.
+- Response body `detail` includes an error mentioning `"text"` and `"max_length"` or `"2000 characters"`.
+
+**Code:**
+
+```python
+def test_post_over_limit_text_returns_422() -> None:
+    mock_snapshot = MagicMock()
+    mock_snapshot.values = {"status": "needs_input"}
+
+    with patch("agents.runtime.server._snapshot", return_value=mock_snapshot):
+        client = TestClient(app)
+        response = client.post("/runs/test-thread/notes", json={"text": "x" * 2001, "author": "analyst"})
+        assert response.status_code == 422
+        detail_str = str(response.json()["detail"]).lower()
+        assert "text" in detail_str and ("2000" in detail_str or "max" in detail_str)
+```
+
+---
+
+### Test 8: POST to a running case returns 400 with "Cannot add notes to a running case"
+
+**Setup:** Mock `_snapshot` to return a state with `status="running"`.  
+**Action:** `POST /runs/{thread_id}/notes {"text": "checked", "author": "analyst"}`.  
+**Assert:**
+- Response status is 400.
+- Response body `error == "Cannot add notes to a running case"`.
+
+**Code:**
+
+```python
+def test_post_to_running_case_returns_400() -> None:
+    mock_snapshot = MagicMock()
+    mock_snapshot.values = {"status": "running"}
+
+    with patch("agents.runtime.server._snapshot", return_value=mock_snapshot):
+        client = TestClient(app)
+        response = client.post("/runs/test-thread/notes", json={"text": "checked", "author": "analyst"})
+        assert response.status_code == 400
+        assert response.json()["error"] == "Cannot add notes to a running case"
+```
+
+---
+
+### Test 9: POST to a finished case returns 400 with "Cannot add notes to a finished case"
+
+**Setup:** Mock `_snapshot` to return a state with `status="done"`.  
+**Action:** `POST /runs/{thread_id}/notes {"text": "checked", "author": "analyst"}`.  
+**Assert:**
+- Response status is 400.
+- Response body `error == "Cannot add notes to a finished case"`.
+
+**Code:**
+
+```python
+def test_post_to_finished_case_returns_400() -> None:
+    mock_snapshot = MagicMock()
+    mock_snapshot.values = {"status": "done"}
+
+    with patch("agents.runtime.server._snapshot", return_value=mock_snapshot):
+        client = TestClient(app)
+        response = client.post("/runs/test-thread/notes", json={"text": "checked", "author": "analyst"})
+        assert response.status_code == 400
+        assert response.json()["error"] == "Cannot add notes to a finished case"
+```
+
+---
+
+### Test 10: The created note is appended to the state's notes list
+
+**Setup:** Mock `_snapshot` to return a paused state with `notes=[{"note_id": "n1", "text": "first", "author": "analyst1", "created_at": "2025-01-24T12:00:00Z"}]`.  
+**Action:** `POST /runs/{thread_id}/notes {"text": "second", "author": "analyst2"}`.  
+**Assert:**
+- Load the state after the POST (`_snapshot`).
+- `notes` has 2 elements: the old note (`n1`) and the new one.
+- The new note's `text == "second"`, `author == "analyst2"`.
+
+**Code:**
+
+```python
+@pytest.mark.asyncio
+async def test_created_note_is_appended(monkeypatch: pytest.MonkeyPatch) -> None:
+    existing_notes = [{"note_id": "n1", "text": "first", "author": "analyst1", "created_at": "2025-01-24T12:00:00Z"}]
+    mock_snapshot_before = MagicMock()
+    mock_snapshot_before.values = {"status": "needs_input", "notes": existing_notes}
+
+    new_note_captured = None
+
+    async def mock_aupdate(self: Any, payload: dict[str, Any], config: dict[str, Any]) -> None:
+        nonlocal new_note_captured
+        new_note_captured = payload["notes"][0]
+
+    with patch("agents.runtime.server._snapshot", return_value=mock_snapshot_before):
+        with patch("agents.runtime.server.open_graph") as mock_graph:
+            mock_graph_instance = AsyncMock()
+            mock_graph_instance.aupdate = mock_aupdate
+            mock_graph.return_value.__aenter__.return_value = mock_graph_instance
+
+            client = TestClient(app)
+            response = client.post("/runs/test-thread/notes", json={"text": "second", "author": "analyst2"})
+            assert response.status_code == 201
+            assert new_note_captured is not None
+            assert new_note_captured["text"] == "second"
+            assert new_note_captured["author"] == "analyst2"
+```
+
+---
+
+### Test 11: GET on a run with notes returns them in the state dict
+
+**Setup:** Mock `_snapshot` to return a state with `notes=[{"note_id": "a1", "text": "checked", "author": "analyst", "created_at": "2025-01-24T12:00:00Z"}]`.  
+**Action:** `GET /runs/{thread_id}`.  
+**Assert:**
+- Response status is 200.
+- Response body `values["notes"] == [{"note_id": "a1", "text": "checked", "author": "analyst", "created_at": "2025-01-24T12:00:00Z"}]`.
+
+**Code:**
+
+```python
+def test_get_run_with_notes_returns_them() -> None:
+    mock_snapshot = MagicMock()
+    mock_snapshot.values = {
+        "status": "needs_input",
+        "notes": [{"note_id": "a1", "text": "checked", "author": "analyst", "created_at": "2025-01-24T12:00:00Z"}],
+    }
+    mock_snapshot.next = []
+
+    with patch("agents.runtime.server._snapshot", return_value=mock_snapshot):
+        client = TestClient(app)
+        response = client.get("/runs/test-thread")
+        assert response.status_code == 200
+        assert response.json()["values"]["notes"] == [
+            {"note_id": "a1", "text": "checked", "author": "analyst", "created_at": "2025-01-24T12:00:00Z"}
+        ]
+```
+
+---
+
+### Test 12: GET on a run with no notes (schema v1) returns values without a notes key
+
+**Setup:** Mock `_snapshot` to return a state with `schema_version=1` and no `notes` field.  
+**Action:** `GET /runs/{thread_id}`.  
+**Assert:**
+- Response status is 200.
+- `"notes" not in response["values"]`.
+
+**Code:**
+
+```python
+def test_get_run_schema_v1_no_notes_key() -> None:
+    mock_snapshot = MagicMock()
+    mock_snapshot.values = {"schema_version": 1, "status": "done"}
+    mock_snapshot.next = []
+
+    with patch("agents.runtime.server._snapshot", return_value=mock_snapshot):
+        client = TestClient(app)
+        response = client.get("/runs/test-thread")
+        assert response.status_code == 200
+        assert "notes" not in response.json()["values"]
+```
+
+---
+
+### Test 13: Notes appear in insertion order (oldest first)
+
+**Setup:** Mock `_snapshot` to return a state with `notes=[{"note_id": "n1", "created_at": "2025-01-24T10:00:00Z", ...}, {"note_id": "n2", "created_at": "2025-01-24T11:00:00Z", ...}, {"note_id": "n3", "created_at": "2025-01-24T12:00:00Z", ...}]`.  
+**Action:** `GET /runs/{thread_id}`.  
+**Assert:**
+- Response `values["notes"]` is a list of 3 elements.
+- The list order is `[n1, n2, n3]` (i.e., `created_at` ascending, matching insertion order).
+
+**Code:**
+
+```python
+def test_notes_appear_in_insertion_order() -> None:
+    mock_snapshot = MagicMock()
+    mock_snapshot.values = {
+        "notes": [
+            {"note_id": "n1", "created_at": "2025-01-24T10:00:00Z", "text": "first", "author": "a1"},
+            {"note_id": "n2", "created_at": "2025-01-24T11:00:00Z", "text": "second", "author": "a2"},
+            {"note_id": "n3", "created_at": "2025-01-24T12:00:00Z", "text": "third", "author": "a3"},
+        ]
+    }
+    mock_snapshot.next = []
+
+    with patch("agents.runtime.server._snapshot", return_value=mock_snapshot):
+        client = TestClient(app)
+        response = client.get("/runs/test-thread")
+        assert response.status_code == 200
+        notes = response.json()["values"]["notes"]
+        assert len(notes) == 3
+        assert [n["note_id"] for n in notes] == ["n1", "n2", "n3"]
+```
+
+---
+
+### Test 14: A finished case still shows its notes
+
+**Setup:** Mock `_snapshot` to return a state with `status="done"` and `notes=[{"note_id": "n1", ...}]`.  
+**Action:** `GET /runs/{thread_id}`.  
+**Assert:**
+- Response status is 200.
+- Response `values["notes"] == [{"note_id": "n1", ...}]`.
+
+**Code:**
+
+```python
+def test_finished_case_shows_notes() -> None:
+    mock_snapshot = MagicMock()
+    mock_snapshot.values = {
+        "status": "done",
+        "notes": [{"note_id": "n1", "text": "checked", "author": "analyst", "created_at": "2025-01-24T12:00:00Z"}],
+    }
+    mock_snapshot.next = []
+
+    with patch("agents.runtime.server._snapshot", return_value=mock_snapshot):
+        client = TestClient(app)
+        response = client.get("/runs/test-thread")
+        assert response.status_code == 200
+        assert response.json()["values"]["notes"] == [
+            {"note_id": "n1", "text": "checked", "author": "analyst", "created_at": "2025-01-24T12:00:00Z"}
+        ]
+```
+
+---
+
+### Test 15: Notes are shown alongside flags and summary (same state structure)
+
+**Setup:** Mock `_snapshot` to return a state with `flags=[{"flag_id": "f1", ...}]`, `summary="paused on mismatch"`, `notes=[{"note_id": "n1", ...}]`.  
+**Action:** `GET /runs/{thread_id}`.  
+**Assert:**
+- Response status is 200.
+- Response `values` includes all three keys: `"flags"`, `"summary"`, `"notes"`.
+- `values["flags"] == [{"flag_id": "f1", ...}]`.
+- `values["summary"] == "paused on mismatch"`.
+- `values["notes"] == [{"note_id": "n1", ...}]`.
+
+**Code:**
+
+```python
+def test_notes_shown_alongside_flags_and_summary() -> None:
+    mock_snapshot = MagicMock()
+    mock_snapshot.values = {
+        "flags": [{"flag_id": "f1", "type": "duplicateSO", "title": "Duplicate SO"}],
+        "summary": "paused on mismatch",
+        "notes": [{"note_id": "n1", "text": "checked", "author": "analyst", "created_at": "2025-01-24T12:00:00Z"}],
+    }
+    mock_snapshot.next = []
+
+    with patch("agents.runtime.server._snapshot", return_value=mock_snapshot):
+        client = TestClient(app)
+        response = client.get("/runs/test-thread")
+        assert response.status_code == 200
+        values = response.json()["values"]
+        assert "flags" in values
+        assert "summary" in values
+        assert "notes" in values
+        assert values["flags"] == [{"flag_id": "f1", "type": "duplicateSO", "title": "Duplicate SO"}]
+        assert values["summary"] == "paused on mismatch"
+        assert values["notes"] == [
+            {"note_id": "n1", "text": "checked", "author": "analyst", "created_at": "2025-01-24T12:00:00Z"}
+        ]
+```
+
+---
+
+**End of LLD.**

@@ -2,39 +2,151 @@
   "items": [
     {
       "id": "C1",
-      "file": "breakdown.md",
-      "section": "## Story 1: Add notes schema to State and increment schema version",
-      "quote": "Verify in `src/agents/runtime/runner.py` where `_initial_state` sets `schema_version` (currently `1`)",
-      "match": [
-        [
-          "stories/01-agent.md",
-          "## File Plan \u203a `src/agents/runtime/runner.py"
-        ]
-      ],
-      "problem": "The breakdown says \"Verify in\" but the story's File Plan section specifies the exact line number (94) and exact change needed. The breakdown's \"Verify in\" language suggests uncertainty about where the change goes, but the story is definite about it. When the breakdown lists a file path as something to check rather than a place to change, but the story changes it, Dev would wonder whether the change was actually approved.",
-      "change": "Replace \"Verify in `src/agents/runtime/runner.py` where `_initial_state` sets `schema_version` (currently `1`)\" with \"Modify `src/agents/runtime/runner.py` in `_initial_state` to set `schema_version` to `2` (currently `1` on line 94 per the story LLD)\".\n---",
-      "status": "fixed",
-      "reason": "",
+      "file": "hld.md",
+      "section": "## Seed: Component Structure",
+      "quote": "src/agents/runtime/runner.py        # schema_version increment in _initial_state",
+      "match": [],
+      "problem": "The HLD says to increment `schema_version` in `_initial_state` at \"line ~94\", but `_initial_state` starts at line 116 and `schema_version` is on line 122.",
+      "change": "Update the line reference to match the actual code: `_initial_state` function (line ~116), and confirm the change is `\"schema_version\": 1` \u2192 `\"schema_version\": 2`.",
+      "status": "outdated",
+      "reason": "its quote is in no spec file",
       "round": 1,
-      "decision": ""
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "Dev would increment `schema_version` to 2 in `_initial_state` (line ~94), but `_initial_state` is at line 116 in the actual code, and it writes `\"schema_version\": 1` on line 122, so the location and current value in the HLD are wrong.",
+      "trail": [
+        "round 1: raised (blocking)",
+        "round 1: outdated: its quote is in no spec file"
+      ],
+      "fix_rounds": [],
+      "pr_comment": "",
+      "pr_path": "",
+      "pr_line": 0,
+      "pr_seen": []
     },
     {
-      "id": "C2",
+      "id": "C1",
       "file": "stories/01-agent.md",
-      "section": "## File Plan \u203a `src/agents/runtime/runner.py",
-      "quote": "In `_initial_state` function (line 94): Change `\"schema_version\": 1` to `\"schema_version\": 2`. Add `\"notes\": []` to the initial state dict (after `\"schema_version\": 2`, before `\"run_id\": run_id`).",
+      "section": "## File Plan",
+      "quote": "In `_initial_state` function (line ~94): change `\"schema_version\": 1` to `\"schema_version\": 2`.",
+      "match": [],
+      "problem": "The line number is wrong. `_initial_state` starts at line 116, and the `schema_version` assignment is at line 122.",
+      "change": "Change \"line ~94\" to \"line ~116\" (where `_initial_state` starts), or \"line ~122\" (where `schema_version` is assigned).",
+      "status": "fixed",
+      "reason": "confirmed in round 3",
+      "round": 2,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "Dev would look for `_initial_state` at line ~94 and find the wrong place in the file, wasting time or editing the wrong line.",
+      "trail": [
+        "round 1: raised (blocking)",
+        "round 1: fix failed: fix refused: would drop sections: get `/runs/{thread_id}` (existing, extended)",
+        "round 2: raised again (blocking)",
+        "round 2: unchecked: fixed in `stories/01-agent.md`, not checked yet",
+        "round 3: fixed: confirmed in round 3"
+      ],
+      "fix_rounds": [
+        2
+      ],
+      "pr_comment": "",
+      "pr_path": "",
+      "pr_line": 0,
+      "pr_seen": []
+    },
+    {
+      "id": "C1",
+      "file": "breakdown.md",
+      "section": "## Story 1: Add reviewer notes to paused cases",
+      "quote": "The endpoint's three return paths all call `_publish`, which returns `{..., \"values\": snapshot.values}` or `{..., \"values\": with_pipeline(payload[\"values\"])}`, and `snapshot.values` is the full `State` dict from the checkpointer, so once `notes` is added to `State`, it appears in every response.",
+      "match": [],
+      "problem": "The breakdown states \"The endpoint's three return paths all call `_publish`, which returns `{..., \"values\": snapshot.values}` or `{..., \"values\": with_pipeline(payload[\"values\"])}`, and `snapshot.values` is the full `State` dict from the checkpointer, so once `notes` is added to `State`, it appears in every response.\" But `server.py::get_run` shows the first path returns `_publish(run)` at line 145 when `run[\"status\"] not in (\"running\", \"failed\") and \"values\" in run`, which uses the `run` dict from `_runs`, not `snapshot.values`. Only the second and third paths involve `snapshot` (lines 149 and 151). The claim that all three paths use `snapshot.values` is wrong.",
+      "change": "Remove \"The endpoint's three return paths all\" and replace with: \"Two of the GET endpoint's paths\". Then clarify: \"The first path (line 145 of `server.py`) returns `_publish(run)` when `run[\"status\"] not in (\"running\", \"failed\")` and `\"values\" in run`, using the `run` dict from `_runs` (which was written at the end of `_execute`). The second path (line 149) returns `_publish({**run, \"values\": snapshot.values})` when `run` exists, and the third path (line 151) returns `_publish({\"values\": snapshot.values, ...})` when `run` does not exist. The second and third paths use `snapshot.values` from the checkpointer; the first uses the `run` dict that `_execute` wrote to `_runs` after the graph finished, which already contains the final `values` from `snapshot.values`. All three paths include `notes` once it is added to `State`, because every path's `values` comes from the checkpointer's `State` (either directly via `snapshot.values`, or via `_runs[thread_id]` which `_execute` wrote from the final snapshot).\"",
+      "status": "open",
+      "reason": "still there after the round 2 fix; no round left",
+      "round": 3,
+      "decision": "The GET endpoint needs no code change. Once `notes` is added to `State`, it appears in the response automatically via the existing `_publish` helper, which already returns the full `State.values` from the checkpointer. This matches the existing pattern for `flags`, `steps`, and `summary`.",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "Dev would believe the GET endpoint returns `snapshot.values` directly, but the code shows it returns `_publish(run)` when `run[\"status\"] not in (\"running\", \"failed\")` and `\"values\" in run` (line 145), which does not involve `snapshot` at all in that path. The breakdown's claim that all three paths use `snapshot.values` is false, so Dev would misunderstand how the endpoint works.",
+      "trail": [
+        "round 1: raised (blocking)",
+        "round 1: the fixer decided: The GET endpoint needs no code change. Once `notes` is added to `State`, it appears in the response automatically via the existing `_publish` helper, which already returns the full `State.values` from the checkpointer. This matches the existing pattern for `flags`, `steps`, and `summary`.",
+        "round 1: unchecked: fixed in `breakdown.md`, not checked yet",
+        "round 2: raised again (blocking)",
+        "round 2: unchecked: fixed in `breakdown.md`, not checked yet",
+        "round 3: raised again (blocking)",
+        "round 3: open: still there after the round 2 fix; no round left"
+      ],
+      "fix_rounds": [
+        1,
+        2
+      ],
+      "pr_comment": "inline-4538507646",
+      "pr_path": "features/PER-199/breakdown.md",
+      "pr_line": 23,
+      "pr_seen": []
+    },
+    {
+      "id": "C4",
+      "file": "stories/01-agent.md",
+      "section": "## Interfaces",
+      "quote": "No new code needed; `notes` appears in `State.values` once the field is added to `State`, and `_publish` already returns the full `values` dict.",
       "match": [
         [
           "breakdown.md",
-          "## Story 1 \u203a **Allowed paths"
+          "Extend the existing `GET /runs/{thread_id}` endpoint"
         ]
       ],
-      "problem": "The breakdown lists `src/agents/runtime/runner.py` as something to \"verify\" in the \"Allowed paths\" note, but the story's File Plan section says to modify it and gives exact line numbers and field positions. The breakdown treats runner.py as context to check, but the story treats it as a file to change, so Dev would follow the story and modify runner.py without knowing whether that was in scope.",
-      "change": "Add `src/agents/runtime/runner.py` to the breakdown's Story 1 \"Allowed paths\" section with a note: \"Modify `_initial_state` to set `schema_version: 2` and initialize `notes: []`.\"\n---",
+      "problem": "The story's Interfaces section correctly says no GET endpoint code is needed, but the breakdown says to extend it, so Dev would write unnecessary code.",
+      "change": "In the breakdown, clarify that the GET endpoint needs no code change: `notes` appears in the response once the field is added to `State`.",
       "status": "fixed",
-      "reason": "",
+      "reason": "no longer raised in round 2",
       "round": 1,
-      "decision": ""
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": false,
+      "blocks_because": "The story (Interfaces section) says no new code is needed for the GET endpoint, but the breakdown says \"Extend the existing `GET /runs/{thread_id}` endpoint\", so Dev would add code for something that already works.",
+      "trail": [
+        "round 1: raised (blocking)",
+        "round 1: fix failed: fix refused: would drop sections: get `/runs/{thread_id}` (existing, extended)",
+        "round 2: fixed: no longer raised in round 2"
+      ],
+      "fix_rounds": [],
+      "pr_comment": "",
+      "pr_path": "",
+      "pr_line": 0,
+      "pr_seen": []
+    },
+    {
+      "id": "C5",
+      "file": "specs/1.md",
+      "section": "Tech Stub \u2014 Ticket 1 \u203a File Touch List \u203a Modified",
+      "quote": "Increment `schema_version` default to `2` in new runs (verify where initial state is created; likely `src/agents/runtime/runner.py::_initial_state`).",
+      "match": [],
+      "problem": "The spec says \"verify where initial state is created; likely `_initial_state`\", but `_initial_state` is exactly where it is (line 116), so the \"verify\" instruction is unnecessary.",
+      "change": "State the location as a fact: \"`src/agents/runtime/runner.py::_initial_state` (line ~116): change `'schema_version': 1` to `'schema_version': 2`.\"",
+      "status": "fixed",
+      "reason": "confirmed in round 2",
+      "round": 1,
+      "decision": "",
+      "severity": "blocking",
+      "code_claim": true,
+      "blocks_because": "The tech stub says \"verify where initial state is created; likely `src/agents/runtime/runner.py::_initial_state`\", but the code shows `_initial_state` is exactly there (line 116), so Dev would waste time verifying something the documents should state.",
+      "trail": [
+        "round 1: raised (blocking)",
+        "round 1: moved from `specs/PER-201.md`: the quoted text is in `specs/1.md`",
+        "round 1: unchecked: fixed in `specs/1.md`, not checked yet",
+        "round 2: fixed: confirmed in round 2"
+      ],
+      "fix_rounds": [
+        1
+      ],
+      "pr_comment": "",
+      "pr_path": "",
+      "pr_line": 0,
+      "pr_seen": []
     }
   ]
 }

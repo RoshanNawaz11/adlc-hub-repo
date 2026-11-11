@@ -25,13 +25,13 @@ Architect reruns to revise HLD per reviewer feedback; requirements, breakdown, s
 ## Steps
 
 1. [x] **analyst (requirements)** — Extract precise requirements from the ticket's acceptance criteria.
-2. [ ] **architect (hld)** _(rerun)_ — New API endpoint, database schema change, and case state checks require HLD.
+2. [x] **architect (hld)** — New API endpoint, database schema change, and case state checks require HLD.
    - focus: Revise the HLD based on reviewer feedback; keep the same scope and requirements.
-3. [ ] **scrum_master (breakdown)** _(rerun)_ — Work splits into storage, API, and UI display stories.
-4. [ ] **designer (lld)** _(rerun)_ — Each story needs file-by-file implementation detail.
-5. [ ] **test_architect (tests)** _(rerun)_ — AC includes edge cases: empty notes, over-limit, wrong state, persistence across restarts.
-6. [ ] **merge_pack (pack)** _(auto)_ _(rerun)_ — Loop feature_with_architecture: Deterministic merged_plan.md from ordered specs and story summaries.
-7. [ ] **critic (consistency_check)** _(rerun)_ — Requirements, HLD, breakdown, stories, and tests must agree on schema, endpoint contract, and validation rules.
+3. [x] **scrum_master (breakdown)** — Work splits into storage, API, and UI display stories.
+4. [x] **designer (lld)** — Each story needs file-by-file implementation detail.
+5. [x] **test_architect (tests)** — AC includes edge cases: empty notes, over-limit, wrong state, persistence across restarts.
+6. [x] **merge_pack (pack)** _(auto)_ — Loop feature_with_architecture: Deterministic merged_plan.md from ordered specs and story summaries.
+7. [x] **critic (consistency_check)** — Requirements, HLD, breakdown, stories, and tests must agree on schema, endpoint contract, and validation rules.
 8. [ ] **architect_gate (review)** _(auto)_ _(rerun)_ — Human approval of specs and this plan before Dev.
 9. [ ] **dev** _(auto)_ — Loop delivery.
 10. [ ] **pre_pr_qa** _(auto)_ — Loop delivery.

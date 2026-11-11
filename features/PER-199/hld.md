@@ -80,6 +80,7 @@ Add persistent, immutable notes to paused cases so reviewers can leave context f
 src/agents/
   graph/states.py          # Note TypedDict, State.notes field
   runtime/server.py        # POST /runs/{thread_id}/notes, CreateNoteRequest
+  runtime/runner.py        # schema_version increment in _initial_state
 ```
 
 **Diagram:**
